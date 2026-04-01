@@ -1,0 +1,396 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Semantic status colors */
+  --color-status-live: var(--status-live);
+  --color-status-live-bg: var(--status-live-bg);
+  --color-status-upcoming: var(--status-upcoming);
+  --color-status-upcoming-bg: var(--status-upcoming-bg);
+  --color-status-completed: var(--status-completed);
+  --color-status-completed-bg: var(--status-completed-bg);
+  --color-status-success: var(--status-success);
+  --color-status-success-bg: var(--status-success-bg);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-bg: var(--status-warning-bg);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-bg: var(--status-danger-bg);
+
+  /* Role colors */
+  --color-role-wk: var(--role-wk);
+  --color-role-bat: var(--role-bat);
+  --color-role-ar: var(--role-ar);
+  --color-role-bowl: var(--role-bowl);
+}
+
+:root {
+  --radius: 1.5rem;
+
+  /* Clean off-white, very faint navy tint */
+  --background: oklch(0.97 0.005 255);
+  --foreground: oklch(0.12 0.02 255);
+
+  /* White cards */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.12 0.02 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.12 0.02 255);
+
+  /* Brand orange — the action/energy color from brand */
+  --primary: oklch(0.52 0.22 35);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Light navy-tinted surfaces */
+  --secondary: oklch(0.94 0.008 255);
+  --secondary-foreground: oklch(0.18 0.02 255);
+  --muted: oklch(0.94 0.008 255);
+  --muted-foreground: oklch(0.45 0.015 255);
+
+  /* Brand gold — prestige/achievement */
+  --accent: oklch(0.68 0.17 86);
+  --accent-foreground: oklch(0.12 0.01 86);
+
+  --destructive: oklch(0.55 0.245 27.325);
+  --border: oklch(0.88 0.010 255);
+  --input: oklch(0.88 0.010 255);
+  --ring: oklch(0.52 0.22 35);
+
+  --chart-1: oklch(0.52 0.22 35);
+  --chart-2: oklch(0.68 0.17 86);
+  --chart-3: oklch(0.55 0.15 145);
+  --chart-4: oklch(0.70 0.18 84);
+  --chart-5: oklch(0.60 0.20 304);
+
+  --sidebar: oklch(0.96 0.005 255);
+  --sidebar-foreground: oklch(0.12 0.02 255);
+  --sidebar-primary: oklch(0.52 0.22 35);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.01 255);
+  --sidebar-accent-foreground: oklch(0.18 0.02 255);
+  --sidebar-border: oklch(0.88 0.010 255);
+  --sidebar-ring: oklch(0.52 0.22 35);
+
+  /* Semantic status tokens (light mode) */
+  --status-live: oklch(0.55 0.24 25);
+  --status-live-bg: oklch(0.55 0.24 25 / 0.10);
+  --status-upcoming: oklch(0.50 0.18 265);
+  --status-upcoming-bg: oklch(0.50 0.18 265 / 0.10);
+  --status-completed: oklch(0.45 0.02 260);
+  --status-completed-bg: oklch(0.45 0.02 260 / 0.10);
+  --status-success: oklch(0.52 0.17 145);
+  --status-success-bg: oklch(0.52 0.17 145 / 0.10);
+  --status-warning: oklch(0.65 0.18 75);
+  --status-warning-bg: oklch(0.65 0.18 75 / 0.10);
+  --status-danger: oklch(0.55 0.24 25);
+  --status-danger-bg: oklch(0.55 0.24 25 / 0.10);
+
+  /* Role colors */
+  --role-wk: oklch(0.65 0.18 75);
+  --role-bat: oklch(0.50 0.18 265);
+  --role-ar: oklch(0.52 0.17 145);
+  --role-bowl: oklch(0.55 0.20 304);
+
+  /* Light mode glass/elevation */
+  --glass-bg: oklch(1 0 0 / 0.80);
+  --glass-bg-hover: oklch(1 0 0 / 0.90);
+  --glass-border: oklch(0.12 0.02 255 / 0.06);
+  --glass-border-hover: oklch(0.12 0.02 255 / 0.10);
+  --glass-shadow: 0 4px 16px oklch(0.12 0.02 255 / 0.08);
+  --glass-shadow-lg: 0 8px 32px oklch(0.12 0.02 255 / 0.12);
+  --glow-primary: 0 0 16px oklch(0.52 0.22 35 / 0.20);
+  --glow-accent: 0 0 16px oklch(0.68 0.17 86 / 0.20);
+}
+
+.dark {
+  /* Brand brand: very dark navy — matches the shield/logo background */
+  --background: oklch(0.10 0.025 255);
+  --foreground: oklch(0.97 0.005 255);
+  --card: oklch(0.15 0.025 255);
+  --card-foreground: oklch(0.97 0.005 255);
+  --popover: oklch(0.15 0.025 255);
+  --popover-foreground: oklch(0.97 0.005 255);
+
+  /* Brand orange — the FANTASY ribbon, batsman uniform, primary action color */
+  --primary: oklch(0.68 0.22 35);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Dark navy surfaces */
+  --secondary: oklch(0.20 0.020 255);
+  --secondary-foreground: oklch(0.97 0.005 255);
+  --muted: oklch(0.20 0.020 255);
+  --muted-foreground: oklch(0.58 0.015 255);
+
+  /* Brand gold — crown, stars, shield outline, prestige elements */
+  --accent: oklch(0.78 0.17 86);
+  --accent-foreground: oklch(0.12 0.01 86);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.23 0.018 255);
+  --input: oklch(0.23 0.018 255);
+  --ring: oklch(0.68 0.22 35);
+
+  --chart-1: oklch(0.68 0.22 35);
+  --chart-2: oklch(0.78 0.17 86);
+  --chart-3: oklch(0.769 0.188 70);
+  --chart-4: oklch(0.627 0.265 304);
+  --chart-5: oklch(0.50 0.18 265);
+
+  --sidebar: oklch(0.10 0.025 255);
+  --sidebar-foreground: oklch(0.97 0.005 255);
+  --sidebar-primary: oklch(0.68 0.22 35);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.20 0.020 255);
+  --sidebar-accent-foreground: oklch(0.97 0.005 255);
+  --sidebar-border: oklch(0.23 0.018 255);
+  --sidebar-ring: oklch(0.68 0.22 35);
+
+  /* Semantic status tokens (dark mode) */
+  --status-live: oklch(0.65 0.24 25);
+  --status-live-bg: oklch(0.65 0.24 25 / 0.12);
+  --status-upcoming: oklch(0.68 0.16 265);
+  --status-upcoming-bg: oklch(0.68 0.16 265 / 0.12);
+  --status-completed: oklch(0.55 0.02 260);
+  --status-completed-bg: oklch(0.55 0.02 260 / 0.12);
+  --status-success: oklch(0.65 0.20 145);
+  --status-success-bg: oklch(0.65 0.20 145 / 0.12);
+  --status-warning: oklch(0.75 0.15 85);
+  --status-warning-bg: oklch(0.75 0.15 85 / 0.12);
+  --status-danger: oklch(0.65 0.24 25);
+  --status-danger-bg: oklch(0.65 0.24 25 / 0.12);
+
+  /* Role colors (cricket conventions — unchanged) */
+  --role-wk: oklch(0.75 0.15 85);
+  --role-bat: oklch(0.68 0.16 265);
+  --role-ar: oklch(0.65 0.20 145);
+  --role-bowl: oklch(0.65 0.20 304);
+
+  /* Glass effect tokens */
+  --glass-bg: oklch(0.12 0.025 255 / 0.75);
+  --glass-bg-hover: oklch(0.15 0.025 255 / 0.80);
+  --glass-border: oklch(1 0 0 / 0.08);
+  --glass-border-hover: oklch(1 0 0 / 0.12);
+  --glass-shadow: 0 4px 16px oklch(0 0 0 / 0.4), 0 8px 32px oklch(0 0 0 / 0.3);
+  --glass-shadow-lg: 0 8px 24px oklch(0 0 0 / 0.5), 0 16px 48px oklch(0 0 0 / 0.4);
+  --glow-primary: 0 0 20px oklch(0.68 0.22 35 / 0.35);
+  --glow-accent: 0 0 20px oklch(0.78 0.17 86 / 0.30);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Glass card base */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+  }
+
+  /* Glass panel — cleaner variant for overlays and buttons */
+  .glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid oklch(1 0 0 / 0.08);
+    box-shadow: 0 4px 30px oklch(0 0 0 / 0.1);
+  }
+
+  /* Display font for headings and scores */
+  .font-display {
+    font-family: var(--font-rajdhani), var(--font-geist-sans), sans-serif;
+  }
+
+  .glass-hover:hover {
+    background: var(--glass-bg-hover);
+    border-color: var(--glass-border-hover);
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+  .glow-accent {
+    box-shadow: var(--glow-accent);
+  }
+
+  /* Horizontal scroll carousel */
+  .snap-x-mandatory {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  .snap-start {
+    scroll-snap-align: start;
+  }
+
+  /* Animation utilities */
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out both;
+  }
+  .animate-count-up {
+    animation: count-up 0.5s ease-out both;
+  }
+  .animate-urgency-pulse {
+    animation: urgency-pulse 1s ease-in-out infinite;
+  }
+}
+
+/* Glass fallback for browsers without backdrop-filter */
+@supports not (backdrop-filter: blur(12px)) {
+  .glass {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+}
+
+/* Ambient gradient orb animations */
+@keyframes drift-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, 20px); }
+}
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-20px, -30px); }
+}
+@keyframes drift-3 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(15px, -15px); }
+}
+
+/* UX animation keyframes */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes urgency-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(10vh) rotate(720deg); opacity: 0; }
+}
+
+/* Disable all custom animations for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .ambient-orb,
+  .animate-slide-up,
+  .animate-count-up,
+  .animate-urgency-pulse {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   Cricket Design Tokens
+   ============================================================ */
+
+@layer utilities {
+  /* Subtle cricket field green radial at the bottom of dark pages */
+  .cricket-field-bg {
+    background-image: radial-gradient(
+      ellipse 90% 40% at 50% 110%,
+      oklch(0.22 0.06 150 / 0.12) 0%,
+      transparent 70%
+    );
+  }
+
+  /* Live match card glow — stronger red-orange ring */
+  .live-glow {
+    box-shadow:
+      0 0 0 1px oklch(0.65 0.22 30 / 0.35),
+      0 0 24px oklch(0.65 0.22 30 / 0.18);
+  }
+
+  /* Medal ring utilities for leaderboard top 3 */
+  .ring-gold {
+    box-shadow: 0 0 0 2px oklch(0.78 0.17 86);
+  }
+  .ring-silver {
+    box-shadow: 0 0 0 2px oklch(0.72 0.01 260);
+  }
+  .ring-bronze {
+    box-shadow: 0 0 0 2px oklch(0.63 0.10 55);
+  }
+
+  /* Role accent utilities for player cards */
+  .role-wk {
+    border-left: 4px solid oklch(0.78 0.17 86);
+    background-color: oklch(0.78 0.17 86 / 0.05);
+  }
+  .role-bat {
+    border-left: 4px solid oklch(0.68 0.16 265);
+    background-color: oklch(0.68 0.16 265 / 0.05);
+  }
+  .role-ar {
+    border-left: 4px solid oklch(0.65 0.20 145);
+    background-color: oklch(0.65 0.20 145 / 0.05);
+  }
+  .role-bowl {
+    border-left: 4px solid oklch(0.65 0.20 304);
+    background-color: oklch(0.65 0.20 304 / 0.05);
+  }
+}
