@@ -19,14 +19,13 @@ A whitelabel fantasy cricket web app. Users pick 11 players per match, earn fant
 - **UI**: Tailwind CSS + shadcn/ui
 - **Backend/DB**: Supabase (PostgreSQL + Auth + RLS)
 - **Hosting**: Vercel
-- **Auth**: Google OAuth via Supabase Auth
+- **Auth**: Email + Password via Supabase Auth
 
 ## Prerequisites
 
 - Node.js 20+
 - A [Supabase](https://supabase.com) account (free tier works)
 - A [Vercel](https://vercel.com) account (free tier works)
-- A [Google Cloud](https://console.cloud.google.com) project (for OAuth)
 - A cricket data API (see [Cricket Data API](#cricket-data-api) section)
 
 ## Quick Start
@@ -62,15 +61,7 @@ npx supabase db push
 
 This creates all tables and seeds 10 IPL teams + 150 players.
 
-### 5. Configure Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials
-2. Create an OAuth 2.0 Client ID (Web application)
-3. Add authorized redirect URI: `https://YOUR_SUPABASE_URL/auth/v1/callback`
-4. Copy the Client ID and Secret to `.env.local`
-5. In Supabase Dashboard → Authentication → Providers → Google: paste the same Client ID and Secret
-
-### 6. Run locally
+### 5. Run locally
 
 ```bash
 npm run dev
@@ -78,7 +69,7 @@ npm run dev
 
 Visit [http://localhost:3000](http://localhost:3000)
 
-### 7. Make yourself admin
+### 6. Make yourself admin
 
 After signing in, run this SQL in Supabase SQL Editor:
 

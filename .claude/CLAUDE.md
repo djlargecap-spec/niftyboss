@@ -12,7 +12,7 @@ No real money. Simple, fun, office-friendly.
 - Hosting: Vercel (free tier)
 - Data API: Generic adapter pattern — bring your own cricket API
 - Mobile: PWA (installable, add-to-home-screen)
-- Auth: Supabase Auth with Google OAuth
+- Auth: Supabase Auth with email + password
 
 ## Architecture Rules
 - Use Next.js App Router (not Pages Router)
