@@ -1,0 +1,17 @@
+name: Fetch Playing XI
+
+on:
+  schedule:
+    # Every 15 min, 09:45–16:00 UTC (announced ~30 min before match start)
+    - cron: '*/15 9-16 * * *'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger fetch playing XI
+        run: |
+          curl --fail --silent --show-error \
+            -X GET "${{ vars.APP_URL }}/api/cron/fetch-playing-xi" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

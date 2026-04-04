@@ -1,0 +1,19 @@
+name: Lock Matches & Auto-pick
+
+on:
+  schedule:
+    # 10:00 UTC = 3:30 PM IST (afternoon match start)
+    - cron: '0 10 * * *'
+    # 14:00 UTC = 7:30 PM IST (evening match start)
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger lock and auto-pick
+        run: |
+          curl --fail --silent --show-error \
+            -X GET "${{ vars.APP_URL }}/api/cron/lock-and-autopick" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
