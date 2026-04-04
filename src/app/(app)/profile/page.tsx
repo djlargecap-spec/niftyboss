@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trophy, Target, TrendingUp, TrendingDown, BookOpen, ChevronRight } from "lucide-react"
+import { Trophy, Target, TrendingUp, TrendingDown, BookOpen, ChevronRight, ShieldCheck } from "lucide-react"
 import { ProfileNameForm } from "./name-form"
 import { SignOutButton } from "./sign-out-button"
 import { ThemeCard } from "./theme-card"
@@ -436,6 +436,25 @@ export default async function ProfilePage() {
           </CardContent>
         </Card>
       </Link>
+
+      {profile?.is_admin && (
+        <Link href="/admin">
+          <Card className="border border-border hover:bg-accent/40 transition-colors cursor-pointer">
+            <CardContent className="flex items-center justify-between py-4 px-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-full bg-red-500/10 p-2">
+                  <ShieldCheck className="h-4 w-4 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Admin Panel</p>
+                  <p className="text-xs text-muted-foreground">Manage matches, players & scoring</p>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       <SignOutButton />
     </div>
