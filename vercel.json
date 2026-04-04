@@ -9,6 +9,10 @@
       "schedule": "0 14 * * *"
     },
     {
+      "path": "/api/cron/fetch-playing-xi",
+      "schedule": "*/15 10-16 * * *"
+    },
+    {
       "path": "/api/cron/live-score",
       "schedule": "*/5 * * * *"
     }
