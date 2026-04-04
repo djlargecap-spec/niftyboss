@@ -1,0 +1,17 @@
+name: Update Match Status
+
+on:
+  schedule:
+    # Every 30 min during IPL match windows (09:00–20:00 UTC = 2:30 PM–1:30 AM IST)
+    - cron: '*/30 9-20 * * *'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger update match status cron
+        run: |
+          curl --fail --silent --show-error \
+            -X GET "${{ vars.APP_URL }}/api/cron/update-match-status" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
