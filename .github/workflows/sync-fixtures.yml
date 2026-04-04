@@ -1,0 +1,17 @@
+name: Sync Fixtures
+
+on:
+  schedule:
+    # Every 6 hours — keeps fixture list fresh without hammering the API
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub Actions UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync fixtures cron
+        run: |
+          curl --fail --silent --show-error \
+            -X GET "${{ vars.APP_URL }}/api/cron/sync-fixtures" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
