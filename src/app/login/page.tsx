@@ -54,16 +54,19 @@ function LoginForm() {
     const supabase = createClient()
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
+      const { data, error } = await supabase.auth.signUp({ email, password })
       if (error) {
-        setError(error.message)
+        if (error.message.toLowerCase().includes("rate limit")) {
+          setError("Too many sign-up attempts. Please try again in a few minutes.")
+        } else {
+          setError(error.message)
+        }
+      } else if (data.session) {
+        // Email confirmation disabled — user is signed in immediately
+        router.push("/dashboard")
+        return
       } else {
+        // Email confirmation still enabled — prompt user
         setMessage("Check your email for a confirmation link.")
       }
     } else {
