@@ -97,14 +97,15 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
       )
     }
 
-    // team_a: if no starter decided yet, show StarterPicker
-    if (session.phase === "team_a" && !session.team_a_starter_id) {
+    // team_a: show StarterPicker until both starter AND team are decided
+    if (session.phase === "team_a" && (!session.team_a_starter_id || !session.team_a_team_id)) {
       return (
         <StarterPicker
           draftSessionId={session.id}
-          matchTeamAName={match.team_home.short_name}
-          matchTeamBName={match.team_away.short_name}
+          teamHome={match.team_home}
+          teamAway={match.team_away}
           currentUserId={user.id}
+          teamAStarterId={session.team_a_starter_id}
           opponentDisplayName={opponentProfile.display_name}
         />
       )

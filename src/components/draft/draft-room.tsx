@@ -3,7 +3,7 @@
 import { useEffect, useTransition, useState } from "react"
 import { useRouter } from "next/navigation"
 import { makePick } from "@/actions/draft"
-import { getDraftedPlayerIds, getActiveTeamId } from "@/lib/draft"
+import { getDraftedPlayerIds, getActiveTeamId, getTeamBId } from "@/lib/draft"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { DraftSession, DraftPick, MatchWithTeams, PlayerWithTeam } from "@/lib/types"
@@ -51,7 +51,10 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
   }
 
   const draftedIds = getDraftedPlayerIds(initialPicks)
-  const activeTeamId = getActiveTeamId(session.phase, match.team_home_id, match.team_away_id)
+  const teamATeamId = session.team_a_team_id ?? match.team_home_id
+  const teamBTeamId = getTeamBId(match.team_home_id, match.team_away_id, teamATeamId)
+  const activeTeamId = getActiveTeamId(session.phase, teamATeamId, teamBTeamId)
+  const activeTeam = activeTeamId === match.team_home_id ? match.team_home : match.team_away
 
   const isMyTurn = session.current_turn === currentUserId
   const myPicks = initialPicks.filter((p) => p.user_id === currentUserId)
@@ -61,9 +64,7 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
     ? players.filter((p) => p.team_id === activeTeamId && !draftedIds.has(p.id))
     : []
 
-  const phaseLabel = session.phase === "team_a"
-    ? `Picking from ${match.team_home.short_name}`
-    : `Picking from ${match.team_away.short_name}`
+  const phaseLabel = `Picking from ${activeTeam.short_name}`
 
   const turnLabel = isMyTurn ? "Your turn to pick" : `${opponentProfile.display_name}'s turn…`
 
@@ -96,8 +97,8 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
       <div className="grid grid-cols-2 gap-3">
         <PickColumn
           label="Your Team"
-          teamALabel={match.team_home.short_name}
-          teamBLabel={match.team_away.short_name}
+          teamALabel={players.find((p) => p.team_id === teamATeamId)?.team.short_name ?? "Team A"}
+          teamBLabel={players.find((p) => p.team_id === teamBTeamId)?.team.short_name ?? "Team B"}
           teamAPicks={myTeamAPicks}
           teamBPicks={myTeamBPicks}
           playerMap={playerMap}
@@ -105,8 +106,8 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
         />
         <PickColumn
           label={opponentProfile.display_name}
-          teamALabel={match.team_home.short_name}
-          teamBLabel={match.team_away.short_name}
+          teamALabel={players.find((p) => p.team_id === teamATeamId)?.team.short_name ?? "Team A"}
+          teamBLabel={players.find((p) => p.team_id === teamBTeamId)?.team.short_name ?? "Team B"}
           teamAPicks={oppTeamAPicks}
           teamBPicks={oppTeamBPicks}
           playerMap={playerMap}
@@ -118,7 +119,7 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
       {isMyTurn && availablePlayers.length > 0 && (
         <div className="space-y-4">
           <p className="text-sm font-medium">
-            Pick from {activeTeamId === match.team_home_id ? match.team_home.short_name : match.team_away.short_name}
+            Pick from {activeTeam.short_name}
           </p>
           {ROLE_ORDER.map((role) => {
             const group = availablePlayers.filter((p) => p.role === role)

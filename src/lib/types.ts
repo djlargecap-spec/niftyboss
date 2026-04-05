@@ -126,6 +126,7 @@ export type DraftSession = {
   pick_count: number  // 0–15
   current_turn: string  // user_id of who picks next
   team_a_starter_id: string | null  // null = not yet decided; shown in StarterPicker
+  team_a_team_id: string | null     // null = starter hasn't chosen team yet; shown in TeamPicker
   created_at: string
   updated_at: string
 }

@@ -34,10 +34,15 @@ export function getDraftedPlayerIds(picks: DraftPick[]): Set<string> {
 
 export function getActiveTeamId(
   phase: DraftPhase,
-  teamHomeId: string,
-  teamAwayId: string
+  teamATeamId: string,   // whichever team the starter chose
+  teamBTeamId: string    // the other team
 ): string | null {
-  if (phase === "team_a") return teamHomeId
-  if (phase === "team_b") return teamAwayId
+  if (phase === "team_a") return teamATeamId
+  if (phase === "team_b") return teamBTeamId
   return null
+}
+
+/** Given two team IDs and the starter's chosen team, return the other team ID */
+export function getTeamBId(teamHomeId: string, teamAwayId: string, teamATeamId: string): string {
+  return teamATeamId === teamHomeId ? teamAwayId : teamHomeId
 }

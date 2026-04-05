@@ -230,7 +230,9 @@ export async function makePick(
   if (!player) return { error: "Player not found" }
   if (!player.is_active) return { error: "Player is not active" }
 
-  const expectedTeamId = session.phase === "team_a" ? match.team_home_id : match.team_away_id
+  const teamATeamId = session.team_a_team_id ?? match.team_home_id
+  const teamBTeamId = teamATeamId === match.team_home_id ? match.team_away_id : match.team_home_id
+  const expectedTeamId = session.phase === "team_a" ? teamATeamId : teamBTeamId
   if (player.team_id !== expectedTeamId) {
     return { error: `Player is not from the correct team for this phase` }
   }
@@ -441,6 +443,38 @@ export async function swapPlayer(
       .eq("id", selection.id)
   }
 
+  return { success: true }
+}
+
+// ─── chooseTeam ───────────────────────────────────────────────
+
+export async function chooseTeam(
+  draftSessionId: string,
+  teamId: string
+): Promise<{ success?: boolean; error?: string }> {
+  const user = await getAuthUser()
+  const admin = createAdminClient()
+
+  const { data: session } = await admin
+    .from("draft_sessions")
+    .select("id, user1_id, user2_id, team_a_starter_id, team_a_team_id, phase")
+    .eq("id", draftSessionId)
+    .single()
+  if (!session) return { error: "Session not found" }
+  if (session.team_a_starter_id !== user.id) return { error: "Only the first picker can choose the team" }
+  if (session.team_a_team_id !== null) return { error: "Team already chosen" }
+  if (session.phase !== "team_a") return { error: "Draft already started" }
+
+  const { error } = await admin
+    .from("draft_sessions")
+    .update({
+      team_a_team_id: teamId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", draftSessionId)
+    .is("team_a_team_id", null) // race-condition guard
+
+  if (error) return { error: error.message }
   return { success: true }
 }
 
