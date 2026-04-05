@@ -79,6 +79,16 @@ export function NavBar({ isAdmin = false, userId = null, initialUnread = false }
               </Link>
             )
           })}
+          {userId && (
+            <Link
+              href="/matches"
+              className="flex flex-col items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] text-xs text-muted-foreground transition-colors relative"
+              aria-label="Notifications"
+            >
+              <NotificationBell userId={userId} initialUnread={initialUnread} />
+              <span className="text-[10px]">Alerts</span>
+            </Link>
+          )}
         </div>
       </nav>
 
@@ -120,10 +130,13 @@ export function NavBar({ isAdmin = false, userId = null, initialUnread = false }
         </nav>
         <div className="p-2 border-t border-white/[0.06] space-y-1">
           {userId && (
-            <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground">
+            <Link
+              href="/matches"
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
               <NotificationBell userId={userId} initialUnread={initialUnread} />
               <span>Notifications</span>
-            </div>
+            </Link>
           )}
           <ThemeToggle showLabel className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full" />
           <button
