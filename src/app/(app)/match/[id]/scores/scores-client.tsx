@@ -70,6 +70,7 @@ type Props = {
   myPlayerIds: string[]
   myCaptainId: string | null
   myVcId: string | null
+  isDraftPick?: boolean
   allSelections: SelectionRow[]
   captainPicks: Record<string, { name: string }>
   currentUserId: string
@@ -106,7 +107,7 @@ function econ(runs: number, overs: number): string {
 
 export function ScoresClient({
   match, home, away, playerScores, userScores, myScore,
-  myPlayerIds, myCaptainId, myVcId, allSelections,
+  myPlayerIds, myCaptainId, myVcId, isDraftPick = false, allSelections,
   captainPicks, currentUserId, banter = [],
 }: Props) {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -195,10 +196,10 @@ export function ScoresClient({
             <p className="text-3xl font-bold font-display tracking-tight">{Number(myScore.total_points)}</p>
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
               {Number(myScore.captain_points) > 0 && (
-                <span>C ×2 <span className="text-primary/70">+{Number(myScore.captain_points)}</span></span>
+                <span>{isDraftPick ? "Impact" : "C"} ×2 <span className="text-primary/70">+{Number(myScore.captain_points)}</span></span>
               )}
-              {Number(myScore.captain_points) > 0 && Number(myScore.vc_points) > 0 && <span>·</span>}
-              {Number(myScore.vc_points) > 0 && (
+              {!isDraftPick && Number(myScore.captain_points) > 0 && Number(myScore.vc_points) > 0 && <span>·</span>}
+              {!isDraftPick && Number(myScore.vc_points) > 0 && (
                 <span>VC ×1.5 <span className="text-primary/70">+{Number(myScore.vc_points)}</span></span>
               )}
             </div>
@@ -274,8 +275,8 @@ export function ScoresClient({
                       !isLast && "border-b border-border/15"
                     )}>
                       <div className="flex items-center gap-0.5">
-                        {ps.isC && <span className="text-[8px] font-bold text-amber-400 mr-px">C</span>}
-                        {ps.isVC && <span className="text-[8px] font-bold text-sky-400 mr-px">VC</span>}
+                        {ps.isC && <span className="text-[8px] font-bold text-amber-400 mr-px">{isDraftPick ? "★" : "C"}</span>}
+                        {!isDraftPick && ps.isVC && <span className="text-[8px] font-bold text-sky-400 mr-px">VC</span>}
                         <Badge variant="outline" className={cn("text-[8px] px-1 py-0 h-[14px] border leading-none", ROLE_COLORS[role])}>
                           {role}
                         </Badge>

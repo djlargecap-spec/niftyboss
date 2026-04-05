@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { NotificationBell } from "@/components/notification-bell"
 
 const mobileNavItems = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -34,7 +35,7 @@ const sidebarNavItems = [
 
 const adminItem = { href: "/admin", label: "Admin", icon: Shield }
 
-export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
+export function NavBar({ isAdmin = false, userId = null, initialUnread = false }: { isAdmin?: boolean; userId?: string | null; initialUnread?: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
 
@@ -118,6 +119,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           })}
         </nav>
         <div className="p-2 border-t border-white/[0.06] space-y-1">
+          {userId && (
+            <div className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground">
+              <NotificationBell userId={userId} initialUnread={initialUnread} />
+              <span>Notifications</span>
+            </div>
+          )}
           <ThemeToggle showLabel className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors w-full" />
           <button
             onClick={handleSignOut}

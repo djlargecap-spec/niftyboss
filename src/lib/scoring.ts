@@ -32,66 +32,11 @@ export function calculatePlayerPoints(
   const breakdown: Record<string, number> = {}
   const ruleMap = new Map(rules.map((r) => [r.name, r.points]))
 
-  function add(name: string, count: number = 1) {
-    const pts = ruleMap.get(name)
-    if (pts && count > 0) {
-      breakdown[name] = pts * count
-    }
-  }
-
-  // Batting
-  add("run", stats.runs)
-  add("four_bonus", stats.fours)
-  add("six_bonus", stats.sixes)
-
-  // Batting milestones — mutually exclusive (highest wins)
-  if (stats.runs >= 100) {
-    add("century")
-  } else if (stats.runs >= 50) {
-    add("half_century")
-  } else if (stats.runs >= 30) {
-    add("thirty")
-  }
-
-  // Duck
-  if (stats.runs === 0 && stats.balls_faced >= 1) {
-    add("duck")
-  }
-
-  // Strike rate bonus/penalty (min 10 balls)
-  if (stats.balls_faced >= 10) {
-    const sr = (stats.runs / stats.balls_faced) * 100
-    if (sr >= 170) add("sr_above_170")
-    else if (sr >= 150) add("sr_150_170")
-    else if (sr < 70) add("sr_below_70")
-    else if (sr < 80) add("sr_70_80")
-  }
-
-  // Bowling
-  add("wicket", stats.wickets)
-  add("maiden", stats.maidens)
-
-  // Wicket hauls — cumulative
-  if (stats.wickets >= 5) add("five_wicket_haul")
-  if (stats.wickets >= 4) add("four_wicket_haul")
-  if (stats.wickets >= 3) add("three_wicket_haul")
-
-  // Economy bonus/penalty (min 2 overs)
-  if (stats.overs_bowled >= 2) {
-    const economy = stats.runs_conceded / stats.overs_bowled
-    if (economy <= 5) add("econ_below_5")
-    else if (economy <= 6) add("econ_5_6")
-    else if (economy > 11) add("econ_above_11")
-    else if (economy >= 10) add("econ_10_11")
-  }
-
-  // Fielding
-  add("catch", stats.catches)
-  add("stumping", stats.stumpings)
-  add("run_out", stats.run_outs)
-
-  // 3+ catches bonus
-  if (stats.catches >= 3) add("three_catch_bonus")
+  if (stats.runs > 0)    breakdown["run"]        = (ruleMap.get("run") ?? 0) * stats.runs
+  if (stats.fours > 0)   breakdown["four_bonus"]  = (ruleMap.get("four_bonus") ?? 0) * stats.fours
+  if (stats.sixes > 0)   breakdown["six_bonus"]   = (ruleMap.get("six_bonus") ?? 0) * stats.sixes
+  if (stats.wickets > 0) breakdown["wicket"]      = (ruleMap.get("wicket") ?? 0) * stats.wickets
+  if (stats.catches > 0) breakdown["catch"]       = (ruleMap.get("catch") ?? 0) * stats.catches
 
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0)
   return { total, breakdown }

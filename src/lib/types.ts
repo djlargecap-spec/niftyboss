@@ -8,6 +8,11 @@ export type ScoringCategory = "batting" | "bowling" | "fielding" | "bonus" | "pe
 
 export type NotificationType = "match_reminder" | "scores_published" | "admin" | "system"
 
+// Draft / 1v1 system
+export type ChallengeStatus = "pending" | "accepted" | "declined" | "expired" | "cancelled"
+export type DraftPhase = "team_a" | "team_b" | "impact_selection" | "complete"
+export type DraftStatus = "active" | "complete" | "abandoned"
+
 // ============================================================
 // Table row types
 // ============================================================
@@ -92,8 +97,46 @@ export type Selection = {
   vice_captain_id: string | null
   is_auto_pick: boolean
   locked_at: string | null
+  // Draft system fields
+  draft_session_id: string | null
+  impact_player_id: string | null
+  is_draft_pick: boolean
   created_at: string
   updated_at: string
+}
+
+export type Challenge = {
+  id: string
+  match_id: string
+  challenger_id: string
+  challenged_id: string
+  status: ChallengeStatus
+  created_at: string
+  updated_at: string
+}
+
+export type DraftSession = {
+  id: string
+  match_id: string
+  challenge_id: string
+  user1_id: string  // challenger, starts Team A
+  user2_id: string  // challenged, starts Team B
+  status: DraftStatus
+  phase: DraftPhase
+  pick_count: number  // 0–15
+  current_turn: string  // user_id of who picks next
+  created_at: string
+  updated_at: string
+}
+
+export type DraftPick = {
+  id: string
+  draft_session_id: string
+  pick_number: number  // 0–15
+  user_id: string
+  player_id: string
+  phase: DraftPhase
+  created_at: string
 }
 
 export type SelectionPlayer = {

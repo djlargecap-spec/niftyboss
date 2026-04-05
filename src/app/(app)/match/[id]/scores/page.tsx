@@ -38,10 +38,10 @@ export default async function ScoresPage({
       .limit(200),
     supabase
       .from("selections")
-      .select("captain_id, vice_captain_id, selection_players(player_id)")
+      .select("captain_id, vice_captain_id, is_draft_pick, selection_players(player_id)")
       .eq("user_id", user.id)
       .eq("match_id", id)
-      .single(),
+      .maybeSingle(),
     admin
       .from("selections")
       .select("user_id, captain_id, vice_captain_id, selection_players(player_id)")
@@ -107,6 +107,7 @@ export default async function ScoresPage({
         myPlayerIds={myPlayerIds}
         myCaptainId={mySelection?.captain_id as string | null ?? null}
         myVcId={mySelection?.vice_captain_id as string | null ?? null}
+        isDraftPick={mySelection?.is_draft_pick ?? false}
         allSelections={allSelections}
         captainPicks={captainPicks}
         currentUserId={user.id}
