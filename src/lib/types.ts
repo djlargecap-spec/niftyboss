@@ -119,12 +119,13 @@ export type DraftSession = {
   id: string
   match_id: string
   challenge_id: string
-  user1_id: string  // challenger, starts Team A
-  user2_id: string  // challenged, starts Team B
+  user1_id: string
+  user2_id: string
   status: DraftStatus
   phase: DraftPhase
   pick_count: number  // 0–15
   current_turn: string  // user_id of who picks next
+  team_a_starter_id: string | null  // null = not yet decided; shown in StarterPicker
   created_at: string
   updated_at: string
 }

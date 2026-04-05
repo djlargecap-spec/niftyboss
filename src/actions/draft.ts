@@ -274,8 +274,9 @@ export async function makePick(
   // Compute next state
   const newPickCount = currentPickNumber + 1
   const newPhase = getPhaseFromPickCount(newPickCount)
+  const teamAStarter = session.team_a_starter_id ?? session.user1_id
   const newTurn = newPickCount < 16
-    ? getWhoseTurn(newPickCount, session.user1_id, session.user2_id)
+    ? getWhoseTurn(newPickCount, teamAStarter, session.user1_id, session.user2_id)
     : session.user1_id // placeholder during impact_selection phase
 
   // Update session
@@ -440,5 +441,37 @@ export async function swapPlayer(
       .eq("id", selection.id)
   }
 
+  return { success: true }
+}
+
+// ─── claimFirstPick ───────────────────────────────────────────
+
+export async function claimFirstPick(
+  draftSessionId: string
+): Promise<{ success?: boolean; error?: string }> {
+  const user = await getAuthUser()
+  const admin = createAdminClient()
+
+  const { data: session } = await admin
+    .from("draft_sessions")
+    .select("id, user1_id, user2_id, team_a_starter_id, phase")
+    .eq("id", draftSessionId)
+    .single()
+  if (!session) return { error: "Session not found" }
+  if (session.user1_id !== user.id && session.user2_id !== user.id) return { error: "Not a participant" }
+  if (session.phase !== "team_a") return { error: "Draft already started" }
+  if (session.team_a_starter_id !== null) return { error: "First pick already claimed" }
+
+  const { error } = await admin
+    .from("draft_sessions")
+    .update({
+      team_a_starter_id: user.id,
+      current_turn: user.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", draftSessionId)
+    .is("team_a_starter_id", null) // guard against race condition
+
+  if (error) return { error: error.message }
   return { success: true }
 }

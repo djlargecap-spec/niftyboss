@@ -8,6 +8,16 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { DraftSession, DraftPick, MatchWithTeams, PlayerWithTeam } from "@/lib/types"
 
+const ROLE_ORDER = ["WK", "BAT", "AR", "BOWL"] as const
+const ROLE_LABELS: Record<string, string> = { WK: "Wicket-Keepers", BAT: "Batters", AR: "All-Rounders", BOWL: "Bowlers" }
+const ROLE_COLORS: Record<string, string> = {
+  WK: "text-amber-400", BAT: "text-blue-400", AR: "text-emerald-400", BOWL: "text-purple-400",
+}
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  WK: "border-amber-400/30 text-amber-400", BAT: "border-blue-400/30 text-blue-400",
+  AR: "border-emerald-400/30 text-emerald-400", BOWL: "border-purple-400/30 text-purple-400",
+}
+
 type Profile = { id: string; display_name: string }
 
 type Props = {
@@ -104,30 +114,38 @@ export function DraftRoom({ match, session, initialPicks, players, currentUserId
         />
       </div>
 
-      {/* Available players */}
+      {/* Available players — segmented by role */}
       {isMyTurn && availablePlayers.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-4">
           <p className="text-sm font-medium">
             Pick from {activeTeamId === match.team_home_id ? match.team_home.short_name : match.team_away.short_name}
           </p>
-          <div className="grid grid-cols-1 gap-2">
-            {availablePlayers.map((player) => (
-              <button
-                key={player.id}
-                onClick={() => handlePick(player.id)}
-                disabled={isPending}
-                className="w-full text-left rounded-lg border border-border bg-card hover:bg-accent/50 active:scale-[0.98] transition-all px-4 py-3 disabled:opacity-50"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{player.name}</p>
-                    <p className="text-xs text-muted-foreground">{player.role}</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs">{player.role}</Badge>
+          {ROLE_ORDER.map((role) => {
+            const group = availablePlayers.filter((p) => p.role === role)
+            if (group.length === 0) return null
+            return (
+              <div key={role}>
+                <p className={`text-[10px] font-semibold uppercase tracking-widest mb-1.5 ${ROLE_COLORS[role]}`}>
+                  {ROLE_LABELS[role]}
+                </p>
+                <div className="space-y-1.5">
+                  {group.map((player) => (
+                    <button
+                      key={player.id}
+                      onClick={() => handlePick(player.id)}
+                      disabled={isPending}
+                      className="w-full text-left rounded-lg border border-border bg-card hover:bg-accent/50 active:scale-[0.98] transition-all px-4 py-2.5 disabled:opacity-50"
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">{player.name}</p>
+                        <Badge variant="outline" className={`text-[10px] ${ROLE_BADGE_COLORS[role]}`}>{role}</Badge>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
-          </div>
+              </div>
+            )
+          })}
         </div>
       )}
 

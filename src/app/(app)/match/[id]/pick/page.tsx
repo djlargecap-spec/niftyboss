@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DraftLobby } from "@/components/draft/draft-lobby"
+import { StarterPicker } from "@/components/draft/starter-picker"
 import { DraftRoom } from "@/components/draft/draft-room"
 import { ImpactPicker } from "@/components/draft/impact-picker"
 import { DraftComplete } from "@/components/draft/draft-complete"
@@ -92,6 +93,19 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
           playingXIIds={playingXIIds}
           mySelection={{ impactPlayerId: mySelection.impact_player_id }}
           opponentSelection={{ impactPlayerId: opponentSelection.impact_player_id }}
+        />
+      )
+    }
+
+    // team_a: if no starter decided yet, show StarterPicker
+    if (session.phase === "team_a" && !session.team_a_starter_id) {
+      return (
+        <StarterPicker
+          draftSessionId={session.id}
+          matchTeamAName={match.team_home.short_name}
+          matchTeamBName={match.team_away.short_name}
+          currentUserId={user.id}
+          opponentDisplayName={opponentProfile.display_name}
         />
       )
     }
