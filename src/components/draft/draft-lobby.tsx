@@ -2,7 +2,6 @@
 
 import { useEffect, useTransition, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { sendChallenge, acceptChallenge, declineChallenge, cancelChallenge } from "@/actions/draft"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,31 +21,14 @@ type Props = {
 
 export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, receivedChallenge }: Props) {
   const router = useRouter()
-  const supabase = createClient()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  // Realtime: refresh when any challenge for this match changes
+  // Poll every 5s — waiting for opponent to accept/decline
   useEffect(() => {
-    const channel = supabase
-      .channel(`challenges-${match.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "challenges",
-        filter: `match_id=eq.${match.id}`,
-      }, () => router.refresh())
-      // Also watch for a new draft_session (challenge accepted → transition to draft room)
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "draft_sessions",
-        filter: `match_id=eq.${match.id}`,
-      }, () => router.refresh())
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [match.id, router, supabase])
+    const interval = setInterval(() => router.refresh(), 5000)
+    return () => clearInterval(interval)
+  }, [router])
 
   function handleSend(challengedId: string) {
     setError(null)

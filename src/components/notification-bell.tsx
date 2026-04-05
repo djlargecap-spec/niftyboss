@@ -10,22 +10,22 @@ type Props = {
 }
 
 export function NotificationBell({ userId, initialUnread }: Props) {
-  const supabase = createClient()
   const [hasUnread, setHasUnread] = useState(initialUnread)
 
+  // Poll every 10s for new unread notifications
   useEffect(() => {
-    const channel = supabase
-      .channel(`notifications-${userId}`)
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "notifications",
-        filter: `user_id=eq.${userId}`,
-      }, () => setHasUnread(true))
-      .subscribe()
+    const interval = setInterval(async () => {
+      const supabase = createClient()
+      const { count } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("is_read", false)
+      setHasUnread((count ?? 0) > 0)
+    }, 10000)
 
-    return () => { supabase.removeChannel(channel) }
-  }, [userId, supabase])
+    return () => clearInterval(interval)
+  }, [userId])
 
   return (
     <div className="relative">

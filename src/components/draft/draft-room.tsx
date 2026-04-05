@@ -1,13 +1,11 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useEffect, useTransition, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { makePick } from "@/actions/draft"
-import { getWhoseTurn, getDraftedPlayerIds, getActiveTeamId } from "@/lib/draft"
+import { getDraftedPlayerIds, getActiveTeamId } from "@/lib/draft"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getInitials, getAvatarColor } from "@/lib/avatar"
 import type { DraftSession, DraftPick, MatchWithTeams, PlayerWithTeam } from "@/lib/types"
 
 type Profile = { id: string; display_name: string }
@@ -23,80 +21,42 @@ type Props = {
 
 export function DraftRoom({ match, session, initialPicks, players, currentUserId, opponentProfile }: Props) {
   const router = useRouter()
-  const supabase = createClient()
   const [isPending, startTransition] = useTransition()
-  const [picks, setPicks] = useState<DraftPick[]>(initialPicks)
-  const [currentSession, setCurrentSession] = useState<DraftSession>(session)
   const [error, setError] = useState<string | null>(null)
 
-  // Realtime: new pick made by either user
+  // Poll every 3s — keeps both users in sync during the draft
   useEffect(() => {
-    const picksChannel = supabase
-      .channel(`draft-picks-${session.id}`)
-      .on("postgres_changes", {
-        event: "INSERT",
-        schema: "public",
-        table: "draft_picks",
-        filter: `draft_session_id=eq.${session.id}`,
-      }, (payload) => {
-        setPicks((prev) => {
-          const exists = prev.some((p) => p.id === payload.new.id)
-          return exists ? prev : [...prev, payload.new as DraftPick]
-        })
-      })
-      .subscribe()
-
-    // Realtime: session phase/turn change
-    const sessionChannel = supabase
-      .channel(`draft-session-${session.id}`)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "draft_sessions",
-        filter: `id=eq.${session.id}`,
-      }, (payload) => {
-        const updated = payload.new as DraftSession
-        setCurrentSession(updated)
-        // Phase transition → re-render server component for new view
-        if (updated.phase !== session.phase && updated.phase !== "team_a" && updated.phase !== "team_b") {
-          router.refresh()
-        }
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(picksChannel)
-      supabase.removeChannel(sessionChannel)
-    }
-  }, [session.id, session.phase, router, supabase])
+    const interval = setInterval(() => router.refresh(), 3000)
+    return () => clearInterval(interval)
+  }, [router])
 
   function handlePick(playerId: string) {
-    if (currentSession.current_turn !== currentUserId) return
+    if (session.current_turn !== currentUserId) return
     setError(null)
     startTransition(async () => {
       const res = await makePick(session.id, playerId)
       if (res.error) setError(res.error)
+      else router.refresh()
     })
   }
 
-  const isMyTurn = currentSession.current_turn === currentUserId
-  const draftedIds = getDraftedPlayerIds(picks)
-  const activeTeamId = getActiveTeamId(currentSession.phase, match.team_home_id, match.team_away_id)
+  const draftedIds = getDraftedPlayerIds(initialPicks)
+  const activeTeamId = getActiveTeamId(session.phase, match.team_home_id, match.team_away_id)
 
-  const myPicks = picks.filter((p) => p.user_id === currentUserId)
-  const opponentPicks = picks.filter((p) => p.user_id !== currentUserId)
+  const isMyTurn = session.current_turn === currentUserId
+  const myPicks = initialPicks.filter((p) => p.user_id === currentUserId)
+  const opponentPicks = initialPicks.filter((p) => p.user_id !== currentUserId)
 
   const availablePlayers = activeTeamId
     ? players.filter((p) => p.team_id === activeTeamId && !draftedIds.has(p.id))
     : []
 
-  const phaseLabel = currentSession.phase === "team_a"
+  const phaseLabel = session.phase === "team_a"
     ? `Picking from ${match.team_home.short_name}`
     : `Picking from ${match.team_away.short_name}`
 
   const turnLabel = isMyTurn ? "Your turn to pick" : `${opponentProfile.display_name}'s turn…`
 
-  // Group my picks by team for display
   const myTeamAPicks = myPicks.filter((p) => p.phase === "team_a")
   const myTeamBPicks = myPicks.filter((p) => p.phase === "team_b")
   const oppTeamAPicks = opponentPicks.filter((p) => p.phase === "team_a")
@@ -203,13 +163,11 @@ function PickColumn({
   isMe: boolean
 }) {
   return (
-    <Card className={`border ${isMe ? "border-primary/30" : "border-border"}`}>
-      <CardContent className="pt-3 pb-3 px-3 space-y-2">
-        <p className="text-xs font-semibold truncate">{label}</p>
-        <TeamPickGroup label={teamALabel} picks={teamAPicks} playerMap={playerMap} />
-        <TeamPickGroup label={teamBLabel} picks={teamBPicks} playerMap={playerMap} />
-      </CardContent>
-    </Card>
+    <div className={`rounded-lg border p-3 space-y-2 ${isMe ? "border-primary/30" : "border-border"}`}>
+      <p className="text-xs font-semibold truncate">{label}</p>
+      <TeamPickGroup label={teamALabel} picks={teamAPicks} playerMap={playerMap} />
+      <TeamPickGroup label={teamBLabel} picks={teamBPicks} playerMap={playerMap} />
+    </div>
   )
 }
 

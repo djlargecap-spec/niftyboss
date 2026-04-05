@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { setImpactPlayer } from "@/actions/draft"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -28,42 +27,17 @@ export function ImpactPicker({
   opponentImpactSet: initialOppSet,
 }: Props) {
   const router = useRouter()
-  const supabase = createClient()
   const [isPending, startTransition] = useTransition()
   const [mySet, setMySet] = useState(initialMySet)
   const [oppSet, setOppSet] = useState(initialOppSet)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Realtime: detect when opponent sets their impact player → transition to complete
+  // Poll every 3s — detect when opponent sets their impact player
   useEffect(() => {
-    const channel = supabase
-      .channel(`draft-session-impact-${session.id}`)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "draft_sessions",
-        filter: `id=eq.${session.id}`,
-      }, (payload) => {
-        if (payload.new.phase === "complete") {
-          router.refresh()
-        }
-      })
-      // Watch for the other user's selection update (captain_id set)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "selections",
-        filter: `draft_session_id=eq.${session.id}`,
-      }, (payload) => {
-        if (payload.new.user_id !== currentUserId && payload.new.captain_id) {
-          setOppSet(true)
-        }
-      })
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [session.id, currentUserId, router, supabase])
+    const interval = setInterval(() => router.refresh(), 3000)
+    return () => clearInterval(interval)
+  }, [router])
 
   function handleConfirm() {
     if (!selectedId) return
