@@ -11,15 +11,53 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Find live matches with a cricapi_match_id — exit early if none (zero CricAPI calls)
+  // Find live matches with a cricapi_match_id
   const { data: liveMatches } = await admin
     .from("matches")
     .select("id, cricapi_match_id, team_home_id, team_away_id")
     .eq("status", "live")
     .not("cricapi_match_id", "is", null)
 
+  // Self-heal: find upcoming matches whose start_time was > 4 hours ago.
+  // These are matches that slipped through before pg_cron was enabled, or were
+  // imported after the match already finished. If SportMonks reports them as
+  // "Finished", transition them to "live" so the scoring loop below picks them up.
+  const { data: missedMatches } = await admin
+    .from("matches")
+    .select("id, cricapi_match_id")
+    .eq("status", "upcoming")
+    .not("cricapi_match_id", "is", null)
+    .lt("start_time", new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString())
+
+  const transitioned: string[] = []
+  for (const missed of missedMatches ?? []) {
+    try {
+      const info = await getCricketProvider().fetchMatchInfo(missed.cricapi_match_id)
+      if (info?.status === "Finished") {
+        await admin.from("matches").update({ status: "live" }).eq("id", missed.id)
+        transitioned.push(missed.id)
+        // Add to liveMatches so scoring runs in this same cron invocation
+        ;(liveMatches ?? []).push({ id: missed.id, cricapi_match_id: missed.cricapi_match_id, team_home_id: "", team_away_id: "" })
+      }
+    } catch {
+      // Non-fatal: will retry on next cron run
+    }
+  }
+
   if (!liveMatches || liveMatches.length === 0) {
-    return Response.json({ updated: [], message: "No live matches" })
+    return Response.json({ updated: [], transitioned, message: "No live matches" })
+  }
+
+  // Reload team IDs for any just-transitioned matches (team IDs were blank above)
+  if (transitioned.length > 0) {
+    const { data: freshRows } = await admin
+      .from("matches")
+      .select("id, cricapi_match_id, team_home_id, team_away_id")
+      .in("id", transitioned)
+    for (const row of freshRows ?? []) {
+      const idx = liveMatches.findIndex((m) => m.id === row.id)
+      if (idx !== -1) liveMatches[idx] = row
+    }
   }
 
   const rules = await loadScoringRules()
@@ -138,17 +176,49 @@ export async function GET(req: NextRequest) {
         continue
       }
 
+      // 5b. Deduplicate by player_id — two different API name variants can fuzzy-match
+      //     to the same DB player (e.g. "MS Dhoni" and "Mahendra Dhoni"), causing
+      //     PostgreSQL to reject the upsert with "affect row a second time".
+      //     Merge stats and recalculate points for any collisions.
+      const deduped = new Map<string, typeof scoreRows[0]>()
+      for (const row of scoreRows) {
+        const prev = deduped.get(row.player_id)
+        if (!prev) {
+          deduped.set(row.player_id, { ...row })
+        } else {
+          const merged = {
+            ...prev,
+            runs: prev.runs + row.runs,
+            balls_faced: prev.balls_faced + row.balls_faced,
+            fours: prev.fours + row.fours,
+            sixes: prev.sixes + row.sixes,
+            wickets: prev.wickets + row.wickets,
+            overs_bowled: prev.overs_bowled + row.overs_bowled,
+            runs_conceded: prev.runs_conceded + row.runs_conceded,
+            maidens: prev.maidens + row.maidens,
+            catches: prev.catches + row.catches,
+            stumpings: prev.stumpings + row.stumpings,
+            run_outs: prev.run_outs + row.run_outs,
+          }
+          const { total, breakdown } = calculatePlayerPoints(merged, rules)
+          merged.fantasy_points = total
+          merged.breakdown = breakdown
+          deduped.set(row.player_id, merged)
+        }
+      }
+      const dedupedRows = [...deduped.values()]
+
       // 6. Upsert player scores (atomic — no gap between delete and insert)
       const { error: upsertPlayerErr } = await admin
         .from("match_player_scores")
-        .upsert(scoreRows, { onConflict: "match_id,player_id" })
+        .upsert(dedupedRows, { onConflict: "match_id,player_id" })
       if (upsertPlayerErr) {
         errors.push({ matchId: match.id, error: upsertPlayerErr.message })
         continue
       }
 
       // 7. Build score map for user calculation
-      const scoreMap = new Map(scoreRows.map((r) => [r.player_id, r.fantasy_points]))
+      const scoreMap = new Map(dedupedRows.map((r) => [r.player_id, r.fantasy_points]))
 
       // 8. Load all selections for this match
       const { data: selections } = await admin

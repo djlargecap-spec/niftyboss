@@ -18,7 +18,7 @@ export default async function ScoresPage({
   const admin = createAdminClient()
 
   // All queries in parallel
-  const [matchRes, playerScoresRes, userScoresRes, mySelectionRes, allSelectionsRes, captainPicksRes, banterRes] = await Promise.all([
+  const [matchRes, playerScoresRes, userScoresRes, mySelectionRes, allSelectionsRes, captainPicksRes] = await Promise.all([
     admin
       .from("matches")
       .select("*, team_home:teams!matches_team_home_id_fkey(short_name, color, logo_url), team_away:teams!matches_team_away_id_fkey(short_name, color, logo_url)")
@@ -52,12 +52,6 @@ export default async function ScoresPage({
       .select("user_id, captain_id, captain:players!selections_captain_id_fkey(name)")
       .eq("match_id", id)
       .not("captain_id", "is", null),
-    admin
-      .from("match_banter")
-      .select("message, event_type")
-      .eq("match_id", id)
-      .order("created_at", { ascending: false })
-      .limit(15),
   ])
 
   const match = matchRes.data
@@ -88,6 +82,26 @@ export default async function ScoresPage({
     captainPicks[s.user_id] = { name: (s.captain as unknown as { name: string })?.name ?? "—" }
   }
 
+  // When the match is locked but scoring hasn't run yet, synthesize 0-pt rows so
+  // the leaderboard tab shows who picked teams (and their team is expandable).
+  let displayUserScores: UserScoreRow[] = userScores
+  if (userScores.length === 0 && isMatchLocked && allSelections.length > 0) {
+    const selUserIds = allSelections.map((s) => s.user_id)
+    const { data: profilesData } = await admin
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", selUserIds)
+    const nameMap = new Map((profilesData ?? []).map((p: { id: string; display_name: string }) => [p.id, p.display_name]))
+    displayUserScores = allSelections.map((s) => ({
+      user_id: s.user_id,
+      total_points: 0,
+      rank: null,
+      captain_points: 0,
+      vc_points: 0,
+      profile: { display_name: nameMap.get(s.user_id) ?? "—" },
+    })) as UserScoreRow[]
+  }
+
   return (
     <PageTransition>
       <ScoresClient
@@ -102,7 +116,7 @@ export default async function ScoresPage({
         home={home}
         away={away}
         playerScores={playerScores}
-        userScores={userScores}
+        userScores={displayUserScores}
         myScore={myScore}
         myPlayerIds={myPlayerIds}
         myCaptainId={mySelection?.captain_id as string | null ?? null}
@@ -111,7 +125,6 @@ export default async function ScoresPage({
         allSelections={allSelections}
         captainPicks={captainPicks}
         currentUserId={user.id}
-        banter={(banterRes.data ?? []).map((b) => ({ message: b.message, event_type: b.event_type }))}
       />
     </PageTransition>
   )

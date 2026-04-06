@@ -31,16 +31,20 @@ export default async function LeaderboardPage() {
   const leaderboard = leaderboardRes.data ?? []
   const matchScoresRaw = matchScoresRes.data ?? []
 
+  // No profiles at all → nothing to show
   if (leaderboard.length === 0) {
     return (
       <PageTransition>
         <div className="p-4 md:p-6 max-w-3xl space-y-6">
           <h1 className="text-2xl font-bold tracking-tight">Leaderboard</h1>
-          <EmptyState icon={TrophyIcon} title="No scores yet" description="Scores will appear here once matches are completed" />
+          <EmptyState icon={TrophyIcon} title="No players yet" description="Standings will appear once players join the league" />
         </div>
       </PageTransition>
     )
   }
+
+  // True when at least one user has scored in a completed match
+  const seasonHasScores = leaderboard.some((e) => Number(e.matches_played) > 0)
 
   // Build a display name map from leaderboard
   const nameMap = new Map(leaderboard.map((e) => [e.user_id, e.display_name]))
@@ -82,6 +86,13 @@ export default async function LeaderboardPage() {
     <div className="p-4 md:p-6 max-w-3xl space-y-6">
       {/* Header */}
       <h1 className="text-2xl font-bold tracking-tight">Leaderboard</h1>
+
+      {/* Season in progress banner */}
+      {!seasonHasScores && (
+        <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-400/90">
+          Season in progress — standings update automatically after each match completes.
+        </div>
+      )}
 
       {/* Season Standings */}
       <div className="rounded-lg border border-border/30 bg-[hsl(var(--background))] overflow-hidden">

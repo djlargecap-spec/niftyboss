@@ -113,6 +113,9 @@ export function ScoresClient({
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
   const myPlayerSet = new Set(myPlayerIds)
 
+  // True when we have user rows but none have scored yet (synthetic 0-pt rows)
+  const scoringPending = userScores.length > 0 && userScores.every((s) => Number(s.total_points) === 0)
+
   // Build lookup maps
   const psMap = new Map(playerScores.map((ps) => [ps.player_id, ps]))
   const selMap = new Map(allSelections.map((s) => [s.user_id, s]))
@@ -226,8 +229,8 @@ export function ScoresClient({
       )}
 
       {/* ── Tabs ─────────────────────────────────────────── */}
-      {playerScores.length > 0 ? (
-        <Tabs defaultValue="your-xi" className="px-4 md:px-6">
+      {playerScores.length > 0 || userScores.length > 0 ? (
+        <Tabs defaultValue={playerScores.length === 0 ? "leaderboard" : "your-xi"} className="px-4 md:px-6">
           <TabsList className="w-full grid grid-cols-3 mb-4">
             <TabsTrigger value="your-xi" className="gap-1.5 text-xs">
               <ClipboardList className="h-3.5 w-3.5" />
@@ -327,7 +330,12 @@ export function ScoresClient({
               <p className="text-sm text-muted-foreground text-center py-8">No scores yet.</p>
             ) : (
               <div>
-                {podiumEntries && <Podium entries={podiumEntries} />}
+                {scoringPending && (
+                  <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-400/80">
+                    Scoring in progress — points will appear here once the scoring pipeline runs (within 5 min of match completion).
+                  </div>
+                )}
+                {!scoringPending && podiumEntries && <Podium entries={podiumEntries} />}
 
                 <div className="flex flex-col gap-1 mt-3">
                   {userScores.map((user) => {
