@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getCricketProvider } from "@/lib/api"
 import { parseScorecardToStats, fuzzyMatchName } from "@/lib/api/utils"
-import { savePlayerScores, calculateMatchPoints } from "@/actions/scoring"
+import { savePlayerScoresCore, calculateMatchPointsCore } from "@/actions/scoring"
 import type { PlayerStats } from "@/lib/scoring"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -216,25 +217,22 @@ export async function fetchMatchScorecard(
 }
 
 /**
- * Auto-score a match in one step using the Fantasy Points API.
- * Fetches innings stats, resolves player IDs (cricapi_id first, name fallback),
- * saves player scores, and calculates user rankings.
+ * Core auto-score logic — no admin auth check, takes an existing admin client.
+ * Called by both the admin server action (autoScoreMatch) and the update-match-status cron.
  */
-export async function autoScoreMatch(
+export async function autoScoreMatchCore(
   matchId: string,
-  cricapiMatchId: string
+  cricapiMatchId: string,
+  admin: SupabaseClient
 ): Promise<{
   success?: boolean
   error?: string
   unmatched?: string[]
   userScores?: Array<{ userId: string; total: number; rank: number }>
 }> {
-  await requireAdmin()
-  const admin = createAdminClient()
-
   const result = await getCricketProvider().fetchMatchPoints(cricapiMatchId)
-  if (!result) return { error: "Fantasy Points API returned no data. Try the manual scorecard flow instead." }
-  if (result.innings.length === 0) return { error: "No innings data in match_points response. Match may not be complete yet." }
+  if (!result) return { error: "Fantasy Points API returned no data." }
+  if (result.innings.length === 0) return { error: "No innings data — match may not be complete yet." }
 
   const parsed = parseScorecardToStats(result.innings)
 
@@ -247,49 +245,64 @@ export async function autoScoreMatch(
 
   const { data: dbPlayers } = await admin
     .from("players")
-    .select("id, name, cricapi_id")
+    .select("id, name, cricapi_id, team_id")
     .in("team_id", [match.team_home_id, match.team_away_id])
   if (!dbPlayers) return { error: "Failed to load players" }
 
-  // Build lookup maps: cricapi_id → db id, and normalized name → db id
   const cricapiIdMap = new Map<string, string>()
   const nameMap = new Map<string, string>()
-  const idToName = new Map<string, string>()
   for (const p of dbPlayers) {
     if (p.cricapi_id) cricapiIdMap.set(p.cricapi_id, p.id)
     const norm = p.name.toLowerCase().replace(/[^a-z\s]/g, "").replace(/\s+/g, " ").trim()
     nameMap.set(norm, p.id)
-    idToName.set(p.id, p.name)
   }
 
-  // Build a map: cricapi player id → db player id from totals
-  const apiIdToDbId = new Map<string, string>()
-  for (const t of result.totals) {
-    const dbId = cricapiIdMap.get(t.id) ?? fuzzyMatchName(t.name, nameMap)
-    if (dbId) apiIdToDbId.set(t.id, dbId)
-  }
-
-  const scores: Array<{ playerId: string; stats: PlayerStats }> = []
+  // Raw scores — may have duplicate playerId when a player has name variants across batting/bowling
+  const rawScores: Array<{ playerId: string; stats: PlayerStats }> = []
   const unmatched: string[] = []
 
   for (const [apiName, stats] of parsed) {
-    // Try ID-based match first via fuzzyMatchName on name (consistent with parseScorecardToStats key)
     const dbId = fuzzyMatchName(apiName, nameMap)
     if (dbId) {
-      scores.push({ playerId: dbId, stats })
+      rawScores.push({ playerId: dbId, stats })
     } else {
       unmatched.push(apiName)
     }
   }
 
-  if (scores.length === 0) {
-    return { error: "No players matched. Check that match teams are correct and player IDs are mapped." }
+  // Deduplicate by playerId — merge stats (handles "Dhoni" + "MS Dhoni" naming variants)
+  const mergedMap = new Map<string, PlayerStats>()
+  for (const { playerId, stats } of rawScores) {
+    if (mergedMap.has(playerId)) {
+      const e = mergedMap.get(playerId)!
+      mergedMap.set(playerId, {
+        runs: e.runs + stats.runs,
+        balls_faced: e.balls_faced + stats.balls_faced,
+        fours: e.fours + stats.fours,
+        sixes: e.sixes + stats.sixes,
+        wickets: e.wickets + stats.wickets,
+        overs_bowled: e.overs_bowled + stats.overs_bowled,
+        runs_conceded: e.runs_conceded + stats.runs_conceded,
+        maidens: e.maidens + stats.maidens,
+        catches: e.catches + stats.catches,
+        stumpings: e.stumpings + stats.stumpings,
+        run_outs: e.run_outs + stats.run_outs,
+      })
+    } else {
+      mergedMap.set(playerId, { ...stats })
+    }
   }
 
-  const saveResult = await savePlayerScores(matchId, scores)
+  const scores = Array.from(mergedMap.entries()).map(([playerId, stats]) => ({ playerId, stats }))
+
+  if (scores.length === 0) {
+    return { error: "No players matched. Check that match teams are correct and player names are mapped." }
+  }
+
+  const saveResult = await savePlayerScoresCore(admin, matchId, scores)
   if (saveResult.error) return { error: `Failed to save scores: ${saveResult.error}` }
 
-  const calcResult = await calculateMatchPoints(matchId)
+  const calcResult = await calculateMatchPointsCore(admin, matchId)
   if (calcResult.error) return { error: `Failed to calculate points: ${calcResult.error}` }
 
   return {
@@ -301,6 +314,19 @@ export async function autoScoreMatch(
       rank: r.rank,
     })),
   }
+}
+
+/**
+ * Auto-score a match in one step using the Fantasy Points API.
+ * Admin-auth gated wrapper around autoScoreMatchCore.
+ */
+export async function autoScoreMatch(
+  matchId: string,
+  cricapiMatchId: string
+) {
+  await requireAdmin()
+  const admin = createAdminClient()
+  return autoScoreMatchCore(matchId, cricapiMatchId, admin)
 }
 
 export type SeriesImportProposal = {

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { loadScoringRules, calculatePlayerPoints, calculateUserMatchScore } from "@/lib/scoring"
 import type { PlayerStats } from "@/lib/scoring"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -22,18 +23,15 @@ async function requireAdmin() {
   return user.id
 }
 
-export async function savePlayerScores(
+// ─── Internal helpers (no auth check — for use by cron routes) ──────────────
+
+export async function savePlayerScoresCore(
+  admin: SupabaseClient,
   matchId: string,
   scores: Array<{ playerId: string; stats: PlayerStats }>
 ) {
-  await requireAdmin()
-  const admin = createAdminClient()
   const rules = await loadScoringRules()
 
-  // Delete existing scores for this match
-  await admin.from("match_player_scores").delete().eq("match_id", matchId)
-
-  // Calculate and insert
   const rows = scores.map(({ playerId, stats }) => {
     const { total, breakdown } = calculatePlayerPoints(stats, rules)
     return {
@@ -55,16 +53,18 @@ export async function savePlayerScores(
     }
   })
 
-  const { error } = await admin.from("match_player_scores").insert(rows)
+  // UPSERT — idempotent, safe to call multiple times, no race condition window
+  const { error } = await admin
+    .from("match_player_scores")
+    .upsert(rows, { onConflict: "match_id,player_id" })
   if (error) return { error: error.message }
   return { success: true }
 }
 
-export async function calculateMatchPoints(matchId: string) {
-  await requireAdmin()
-  const admin = createAdminClient()
-
-  // Get player scores for this match
+export async function calculateMatchPointsCore(
+  admin: SupabaseClient,
+  matchId: string
+) {
   const { data: playerScores } = await admin
     .from("match_player_scores")
     .select("player_id, fantasy_points")
@@ -76,7 +76,6 @@ export async function calculateMatchPoints(matchId: string) {
 
   const scoreMap = new Map(playerScores.map((s) => [s.player_id, s.fantasy_points]))
 
-  // Get all selections for this match (up to 100 users)
   const { data: selections } = await admin
     .from("selections")
     .select("id, user_id, captain_id, vice_captain_id, is_auto_pick")
@@ -87,7 +86,6 @@ export async function calculateMatchPoints(matchId: string) {
     return { error: "No selections found for this match" }
   }
 
-  // Get selection players (100 users × 11 players = 1100 rows, exceeds Supabase 1000 default)
   const selectionIds = selections.map((s) => s.id)
   const { data: selPlayers } = await admin
     .from("selection_players")
@@ -97,7 +95,6 @@ export async function calculateMatchPoints(matchId: string) {
 
   if (!selPlayers) return { error: "Failed to load selection players" }
 
-  // Group players by selection
   const playersBySelection = new Map<string, string[]>()
   for (const sp of selPlayers) {
     const arr = playersBySelection.get(sp.selection_id) ?? []
@@ -105,7 +102,6 @@ export async function calculateMatchPoints(matchId: string) {
     playersBySelection.set(sp.selection_id, arr)
   }
 
-  // Calculate per-user scores
   const userScores = selections.map((sel) => {
     const result = calculateUserMatchScore(
       {
@@ -127,10 +123,8 @@ export async function calculateMatchPoints(matchId: string) {
     }
   })
 
-  // Sort by total descending for ranking
   userScores.sort((a, b) => b.total - a.total)
 
-  // Assign ranks (handle ties)
   let currentRank = 1
   for (let i = 0; i < userScores.length; i++) {
     if (i > 0 && userScores[i].total < userScores[i - 1].total) {
@@ -139,10 +133,9 @@ export async function calculateMatchPoints(matchId: string) {
     userScores[i].rank = currentRank
   }
 
-  // Delete existing user match scores
+  // Delete existing user match scores then insert fresh
   await admin.from("user_match_scores").delete().eq("match_id", matchId)
 
-  // Insert user match scores
   const rows = userScores.map((s) => ({
     user_id: s.userId,
     match_id: matchId,
@@ -156,13 +149,27 @@ export async function calculateMatchPoints(matchId: string) {
   const { error } = await admin.from("user_match_scores").insert(rows)
   if (error) return { error: error.message }
 
-  // Update match status to completed
   await admin.from("matches").update({ status: "completed" }).eq("id", matchId)
-
-  // Refresh leaderboard
   await admin.rpc("refresh_leaderboard")
 
   return { success: true, results: userScores }
+}
+
+// ─── Public server actions (admin-auth gated) ───────────────────────────────
+
+export async function savePlayerScores(
+  matchId: string,
+  scores: Array<{ playerId: string; stats: PlayerStats }>
+) {
+  await requireAdmin()
+  const admin = createAdminClient()
+  return savePlayerScoresCore(admin, matchId, scores)
+}
+
+export async function calculateMatchPoints(matchId: string) {
+  await requireAdmin()
+  const admin = createAdminClient()
+  return calculateMatchPointsCore(admin, matchId)
 }
 
 /**
@@ -243,13 +250,11 @@ export async function calculateLiveMatchPoints(matchId: string) {
     breakdown: null,
   }))
 
-  // Upsert — safe to run repeatedly during a live match
   const { error } = await admin
     .from("user_match_scores")
     .upsert(rows, { onConflict: "user_id,match_id" })
   if (error) return { error: error.message }
 
-  // Record when live points were last calculated
   await admin.from("matches").update({ live_scores_at: new Date().toISOString() }).eq("id", matchId)
 
   return { success: true, count: userScores.length }

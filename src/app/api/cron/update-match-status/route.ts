@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getCricketProvider } from "@/lib/api"
+import { autoScoreMatchCore } from "@/actions/matches"
 
 // SportMonks statuses that map to our DB statuses
 const FINISHED_STATUSES = new Set(["Finished"])
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     .not("cricapi_match_id", "is", null)
     .or(`status.eq.live,and(status.eq.upcoming,start_time.lt.${now})`)
     .order("start_time", { ascending: true })
-    .limit(50) // cap API calls per run
+    .limit(50)
 
   if (!matches || matches.length === 0) {
     return Response.json({ message: "No matches to check", completed: 0, no_result: 0 })
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest) {
   let completed = 0
   let no_result = 0
   const errors: string[] = []
+  const scoringResults: Record<string, unknown> = {}
 
   for (const match of matches) {
     try {
@@ -49,6 +51,13 @@ export async function GET(req: NextRequest) {
           })
           .eq("id", match.id)
         completed++
+
+        // Auto-score now that the match is complete
+        // Skips silently if scorecard not ready yet — admin can retry manually
+        const scoreResult = await autoScoreMatchCore(match.id, match.cricapi_match_id!, admin)
+        scoringResults[match.id] = scoreResult.success
+          ? { ok: true, unmatched: scoreResult.unmatched }
+          : { ok: false, error: scoreResult.error }
       } else if (NO_RESULT_STATUSES.has(info.status)) {
         await admin
           .from("matches")
@@ -70,6 +79,7 @@ export async function GET(req: NextRequest) {
     checked: matches.length,
     completed,
     no_result,
+    scoring: Object.keys(scoringResults).length > 0 ? scoringResults : undefined,
     errors: errors.length > 0 ? errors : undefined,
   })
 }
