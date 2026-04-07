@@ -23,7 +23,7 @@ export default async function LeaderboardPage() {
       .order("season_rank", { ascending: true }),
     supabase
       .from("user_match_scores")
-      .select("match_id, user_id, total_points, rank, match:matches(match_number)")
+      .select("match_id, user_id, total_points, net_points, rank, match:matches(match_number)")
       .order("match_id", { ascending: false })
       .limit(500),
   ])
@@ -50,7 +50,7 @@ export default async function LeaderboardPage() {
   const nameMap = new Map(leaderboard.map((e) => [e.user_id, e.display_name]))
 
   // Build matchday history (winners per match)
-  type MatchWinner = { matchNumber: number; matchId: string; winners: { name: string; points: number }[] }
+  type MatchWinner = { matchNumber: number; matchId: string; winners: { name: string; points: number; netPoints: number | null }[] }
   const matchesMap = new Map<string, MatchWinner>()
   for (const row of matchScoresRaw) {
     const matchNumber = (row.match as unknown as { match_number: number })?.match_number
@@ -65,6 +65,7 @@ export default async function LeaderboardPage() {
     matchesMap.get(row.match_id)!.winners.push({
       name: nameMap.get(row.user_id) ?? "Unknown",
       points: row.total_points,
+      netPoints: (row as unknown as { net_points: number | null }).net_points ?? null,
     })
   }
   const matchHistory = [...matchesMap.values()].sort((a, b) => b.matchNumber - a.matchNumber)
@@ -189,7 +190,11 @@ export default async function LeaderboardPage() {
                     </span>
                   </div>
                 </div>
-                <span className="text-sm font-bold font-display tabular-nums">{match.winners[0]?.points} pts</span>
+                <span className="text-sm font-bold font-display tabular-nums">
+                  {match.winners[0]?.netPoints != null
+                    ? `+${match.winners[0].netPoints}`
+                    : `${match.winners[0]?.points}`} pts
+                </span>
               </div>
             ))}
           </div>

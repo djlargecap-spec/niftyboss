@@ -84,6 +84,12 @@ export default async function AdminMatchPage({
     player_ids: (s.selection_players as { player_id: string }[]).map((sp) => sp.player_id),
   }))
 
+  // Existing H2H pairings for this match
+  const { data: existingPairings } = await admin
+    .from("match_pairings")
+    .select("user1_id, user2_id")
+    .eq("match_id", id)
+
   // Season top 5 for WhatsApp message
   const { data: seasonTop5 } = await admin
     .from("season_leaderboard")
@@ -111,6 +117,7 @@ export default async function AdminMatchPage({
       }
       selectionCount={selectionCount ?? 0}
       userSelections={userSelections}
+      existingPairings={(existingPairings ?? []) as Array<{ user1_id: string; user2_id: string }>}
     />
   )
 }

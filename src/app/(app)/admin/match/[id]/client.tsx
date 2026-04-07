@@ -11,7 +11,7 @@ import { formatIST } from "@/lib/utils"
 import type { MatchWithTeams, PlayerWithTeam, MatchPlayerScore } from "@/lib/types"
 import type { PlayerStats } from "@/lib/scoring"
 import { lockMatch, markNoResult, fetchPlayingXI, fetchMatchScorecard, autoScoreMatch, testMatchPoints } from "@/actions/matches"
-import { savePlayerScores, calculateMatchPoints, calculateLiveMatchPoints } from "@/actions/scoring"
+import { savePlayerScores, calculateMatchPoints, calculateLiveMatchPoints, savePairings } from "@/actions/scoring"
 import { adminUpdateCaptainVc } from "@/actions/selections"
 
 type UserScoreRow = {
@@ -40,6 +40,7 @@ type Props = {
   seasonTop5: Array<{ displayName: string; totalPoints: number }>
   selectionCount: number
   userSelections?: UserSelection[]
+  existingPairings?: Array<{ user1_id: string; user2_id: string }>
 }
 
 type ScoreEntry = Record<string, PlayerStats>
@@ -64,9 +65,10 @@ export function AdminMatchClient({
   playingXIIds: initialXIIds,
   existingScores,
   userScores,
-  seasonTop5,
+  seasonTop5: _seasonTop5,
   selectionCount,
   userSelections = [],
+  existingPairings = [],
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -76,6 +78,9 @@ export function AdminMatchClient({
   const [editUserId, setEditUserId] = useState<string>("")
   const [editCaptainId, setEditCaptainId] = useState<string>("")
   const [editVcId, setEditVcId] = useState<string>("")
+  const [pairs, setPairs] = useState<Array<{ user1: string; user2: string }>>(
+    existingPairings.map((p) => ({ user1: p.user1_id, user2: p.user2_id }))
+  )
 
   // Initialize score entries from existing scores or empty
   const initScores = (): ScoreEntry => {
@@ -579,6 +584,94 @@ export function AdminMatchClient({
           </CardContent>
         </Card>
       )}
+      {/* H2H Pairings */}
+      {userScores.length > 0 && (
+        <Card className="border border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">H2H Pairings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {pairs.map((pair, idx) => {
+              const usedIds = new Set(
+                pairs.flatMap((p, i) => (i === idx ? [] : [p.user1, p.user2]))
+              )
+              const available = userScores.filter((u) => !usedIds.has(u.user_id))
+              return (
+                <div key={idx} className="flex items-center gap-2">
+                  <select
+                    value={pair.user1}
+                    onChange={(e) => {
+                      const updated = [...pairs]
+                      updated[idx] = { ...updated[idx], user1: e.target.value }
+                      setPairs(updated)
+                    }}
+                    className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Player 1...</option>
+                    {[...available, ...(pair.user1 ? userScores.filter(u => u.user_id === pair.user1) : [])].map((u) => (
+                      <option key={u.user_id} value={u.user_id}>{u.displayName} ({u.total_points} pts)</option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-muted-foreground shrink-0">vs</span>
+                  <select
+                    value={pair.user2}
+                    onChange={(e) => {
+                      const updated = [...pairs]
+                      updated[idx] = { ...updated[idx], user2: e.target.value }
+                      setPairs(updated)
+                    }}
+                    className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
+                  >
+                    <option value="">Player 2...</option>
+                    {[...available, ...(pair.user2 ? userScores.filter(u => u.user_id === pair.user2) : [])].filter(u => u.user_id !== pair.user1).map((u) => (
+                      <option key={u.user_id} value={u.user_id}>{u.displayName} ({u.total_points} pts)</option>
+                    ))}
+                  </select>
+                  {pair.user1 && pair.user2 && (
+                    <span className="text-xs font-bold tabular-nums shrink-0 w-16 text-right">
+                      {userScores.find(u => u.user_id === pair.user1)?.total_points ?? 0}–{userScores.find(u => u.user_id === pair.user2)?.total_points ?? 0}
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-2 text-muted-foreground"
+                    onClick={() => setPairs(pairs.filter((_, i) => i !== idx))}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              )
+            })}
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPairs([...pairs, { user1: "", user2: "" }])}
+              >
+                + Add Pair
+              </Button>
+              <Button
+                size="sm"
+                disabled={isPending || pairs.some((p) => !p.user1 || !p.user2)}
+                onClick={() => {
+                  startTransition(async () => {
+                    const res = await savePairings(
+                      match.id,
+                      pairs.map((p) => ({ user1_id: p.user1, user2_id: p.user2 }))
+                    )
+                    if (res.error) showMsg("error", res.error)
+                    else { showMsg("success", "Pairings saved — re-run Calculate Points to apply net scores"); router.refresh() }
+                  })
+                }}
+              >
+                Save Pairings
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Edit User Team — C/VC Editor */}
       {userSelections.length > 0 && (
         <Card className="border border-border">

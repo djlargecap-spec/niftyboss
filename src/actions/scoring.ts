@@ -149,6 +149,30 @@ export async function calculateMatchPointsCore(
   const { error } = await admin.from("user_match_scores").insert(rows)
   if (error) return { error: error.message }
 
+  // Apply H2H net points from pairings (if any are set for this match)
+  const { data: pairings } = await admin
+    .from("match_pairings")
+    .select("user1_id, user2_id")
+    .eq("match_id", matchId)
+
+  if (pairings && pairings.length > 0) {
+    const pointsByUser = new Map(userScores.map((s) => [s.userId, s.total]))
+    await Promise.all(
+      pairings.flatMap((pair) => {
+        const pts1 = pointsByUser.get(pair.user1_id) ?? 0
+        const pts2 = pointsByUser.get(pair.user2_id) ?? 0
+        return [
+          admin.from("user_match_scores")
+            .update({ net_points: pts1 - pts2 })
+            .eq("match_id", matchId).eq("user_id", pair.user1_id),
+          admin.from("user_match_scores")
+            .update({ net_points: pts2 - pts1 })
+            .eq("match_id", matchId).eq("user_id", pair.user2_id),
+        ]
+      })
+    )
+  }
+
   await admin.from("matches").update({ status: "completed" }).eq("id", matchId)
   await admin.rpc("refresh_leaderboard")
 
@@ -170,6 +194,30 @@ export async function calculateMatchPoints(matchId: string) {
   await requireAdmin()
   const admin = createAdminClient()
   return calculateMatchPointsCore(admin, matchId)
+}
+
+export async function savePairings(
+  matchId: string,
+  pairs: Array<{ user1_id: string; user2_id: string }>
+) {
+  await requireAdmin()
+  const admin = createAdminClient()
+
+  // Replace all pairings for this match atomically
+  await admin.from("match_pairings").delete().eq("match_id", matchId)
+
+  if (pairs.length === 0) return { success: true }
+
+  const rows = pairs.map((p) => ({
+    match_id: matchId,
+    user1_id: p.user1_id,
+    user2_id: p.user2_id,
+  }))
+
+  const { error } = await admin.from("match_pairings").insert(rows)
+  if (error) return { error: error.message }
+
+  return { success: true }
 }
 
 /**
