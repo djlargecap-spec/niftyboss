@@ -41,6 +41,7 @@ type Props = {
   selectionCount: number
   userSelections?: UserSelection[]
   existingPairings?: Array<{ user1_id: string; user2_id: string }>
+  allProfiles?: Array<{ id: string; display_name: string }>
 }
 
 type ScoreEntry = Record<string, PlayerStats>
@@ -69,6 +70,7 @@ export function AdminMatchClient({
   selectionCount,
   userSelections = [],
   existingPairings = [],
+  allProfiles = [],
 }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -603,7 +605,7 @@ export function AdminMatchClient({
         </Card>
       )}
       {/* H2H Pairings */}
-      {userSelections.length > 0 && (
+      {allProfiles.length > 0 && (
         <Card className="border border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">H2H Pairings</CardTitle>
@@ -611,10 +613,10 @@ export function AdminMatchClient({
           <CardContent className="space-y-3">
             {(() => {
               const scoreMap = new Map(userScores.map((u) => [u.user_id, u.total_points]))
-              const allUsers = userSelections.map((u) => ({
-                user_id: u.user_id,
+              const allUsers = allProfiles.map((u) => ({
+                user_id: u.id,
                 displayName: u.display_name,
-                total_points: scoreMap.get(u.user_id) ?? null,
+                total_points: scoreMap.get(u.id) ?? null,
               }))
               const label = (u: { displayName: string; total_points: number | null }) =>
                 u.total_points != null ? `${u.displayName} (${u.total_points} pts)` : u.displayName

@@ -84,6 +84,12 @@ export default async function AdminMatchPage({
     player_ids: (s.selection_players as { player_id: string }[]).map((sp) => sp.player_id),
   }))
 
+  // All registered profiles for pairing dropdowns
+  const { data: allProfiles } = await admin
+    .from("profiles")
+    .select("id, display_name")
+    .order("display_name")
+
   // Existing H2H pairings for this match
   const { data: existingPairings } = await admin
     .from("match_pairings")
@@ -118,6 +124,7 @@ export default async function AdminMatchPage({
       selectionCount={selectionCount ?? 0}
       userSelections={userSelections}
       existingPairings={(existingPairings ?? []) as Array<{ user1_id: string; user2_id: string }>}
+      allProfiles={(allProfiles ?? []) as Array<{ id: string; display_name: string }>}
     />
   )
 }
