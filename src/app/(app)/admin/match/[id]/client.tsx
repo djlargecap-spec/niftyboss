@@ -609,21 +609,16 @@ export function AdminMatchClient({
             <CardTitle className="text-base">H2H Pairings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {pairs.map((pair, idx) => {
-              const usedIds = new Set(
-                pairs.flatMap((p, i) => (i === idx ? [] : [p.user1, p.user2]))
-              )
-              // Use userSelections as the source; merge in scored pts if available
+            {(() => {
               const scoreMap = new Map(userScores.map((u) => [u.user_id, u.total_points]))
               const allUsers = userSelections.map((u) => ({
                 user_id: u.user_id,
                 displayName: u.display_name,
                 total_points: scoreMap.get(u.user_id) ?? null,
               }))
-              const available = allUsers.filter((u) => !usedIds.has(u.user_id))
               const label = (u: { displayName: string; total_points: number | null }) =>
                 u.total_points != null ? `${u.displayName} (${u.total_points} pts)` : u.displayName
-              return (
+              return pairs.map((pair, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <select
                     value={pair.user1}
@@ -635,7 +630,7 @@ export function AdminMatchClient({
                     className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
                   >
                     <option value="">Player 1...</option>
-                    {[...available, ...(pair.user1 ? allUsers.filter(u => u.user_id === pair.user1) : [])].map((u) => (
+                    {allUsers.map((u) => (
                       <option key={u.user_id} value={u.user_id}>{label(u)}</option>
                     ))}
                   </select>
@@ -650,7 +645,7 @@ export function AdminMatchClient({
                     className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
                   >
                     <option value="">Player 2...</option>
-                    {[...available, ...(pair.user2 ? allUsers.filter(u => u.user_id === pair.user2) : [])].filter(u => u.user_id !== pair.user1).map((u) => (
+                    {allUsers.filter((u) => u.user_id !== pair.user1).map((u) => (
                       <option key={u.user_id} value={u.user_id}>{label(u)}</option>
                     ))}
                   </select>
@@ -672,8 +667,8 @@ export function AdminMatchClient({
                     ✕
                   </Button>
                 </div>
-              )
-            })}
+              ))
+            })()}
             <div className="flex gap-2 pt-1">
               <Button
                 variant="outline"
@@ -686,10 +681,18 @@ export function AdminMatchClient({
                 size="sm"
                 disabled={isPending || pairs.some((p) => !p.user1 || !p.user2)}
                 onClick={() => {
+                  // Deduplicate: treat (A,B) and (B,A) as the same pair
+                  const seen = new Set<string>()
+                  const deduped = pairs.filter((p) => {
+                    const key = [p.user1, p.user2].sort().join(":")
+                    if (seen.has(key)) return false
+                    seen.add(key)
+                    return true
+                  })
                   startTransition(async () => {
                     const res = await savePairings(
                       match.id,
-                      pairs.map((p) => ({ user1_id: p.user1, user2_id: p.user2 }))
+                      deduped.map((p) => ({ user1_id: p.user1, user2_id: p.user2 }))
                     )
                     if (res.error) showMsg("error", res.error)
                     else { showMsg("success", "Pairings saved — re-run Calculate Points to apply net scores"); router.refresh() }

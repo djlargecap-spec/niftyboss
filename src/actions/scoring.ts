@@ -157,19 +157,20 @@ export async function calculateMatchPointsCore(
 
   if (pairings && pairings.length > 0) {
     const pointsByUser = new Map(userScores.map((s) => [s.userId, s.total]))
+    // Accumulate net across all pairings per user (a user may face multiple opponents)
+    const netByUser = new Map<string, number>()
+    for (const pair of pairings) {
+      const pts1 = pointsByUser.get(pair.user1_id) ?? 0
+      const pts2 = pointsByUser.get(pair.user2_id) ?? 0
+      netByUser.set(pair.user1_id, (netByUser.get(pair.user1_id) ?? 0) + (pts1 - pts2))
+      netByUser.set(pair.user2_id, (netByUser.get(pair.user2_id) ?? 0) + (pts2 - pts1))
+    }
     await Promise.all(
-      pairings.flatMap((pair) => {
-        const pts1 = pointsByUser.get(pair.user1_id) ?? 0
-        const pts2 = pointsByUser.get(pair.user2_id) ?? 0
-        return [
-          admin.from("user_match_scores")
-            .update({ net_points: pts1 - pts2 })
-            .eq("match_id", matchId).eq("user_id", pair.user1_id),
-          admin.from("user_match_scores")
-            .update({ net_points: pts2 - pts1 })
-            .eq("match_id", matchId).eq("user_id", pair.user2_id),
-        ]
-      })
+      [...netByUser.entries()].map(([userId, net]) =>
+        admin.from("user_match_scores")
+          .update({ net_points: net })
+          .eq("match_id", matchId).eq("user_id", userId)
+      )
     )
   }
 
