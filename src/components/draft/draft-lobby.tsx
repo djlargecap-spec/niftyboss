@@ -15,11 +15,11 @@ type Props = {
   match: MatchWithTeams
   currentUserId: string
   allProfiles: Profile[]
-  sentChallenge: (Challenge & { challenged: Profile }) | null
-  receivedChallenge: (Challenge & { challenger: Profile }) | null
+  sentChallenges: (Challenge & { challenged: Profile })[]
+  receivedChallenges: (Challenge & { challenger: Profile })[]
 }
 
-export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, receivedChallenge }: Props) {
+export function DraftLobby({ match, currentUserId, allProfiles, sentChallenges, receivedChallenges }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +66,10 @@ export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, r
     })
   }
 
+  // IDs that already have a pending challenge in either direction — disable button for those
+  const pendingSentIds = new Set(sentChallenges.map((c) => c.challenged.id))
+  const pendingReceivedIds = new Set(receivedChallenges.map((c) => c.challenger.id))
+
   const challengeable = allProfiles.filter((p) => p.id !== currentUserId)
 
   return (
@@ -85,52 +89,42 @@ export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, r
         </div>
       )}
 
-      {/* Incoming challenge */}
-      {receivedChallenge && (
-        <Card className="border-primary/40 bg-primary/5">
+      {/* Incoming challenges */}
+      {receivedChallenges.map((c) => (
+        <Card key={c.id} className="border-primary/40 bg-primary/5">
           <CardContent className="pt-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-full ${getAvatarColor(receivedChallenge.challenger.display_name)} flex items-center justify-center`}>
-                <span className="text-white text-sm font-bold">{getInitials(receivedChallenge.challenger.display_name)}</span>
+              <div className={`h-10 w-10 rounded-full ${getAvatarColor(c.challenger.display_name)} flex items-center justify-center`}>
+                <span className="text-white text-sm font-bold">{getInitials(c.challenger.display_name)}</span>
               </div>
               <div className="flex-1">
-                <p className="font-medium text-sm">{receivedChallenge.challenger.display_name}</p>
+                <p className="font-medium text-sm">{c.challenger.display_name}</p>
                 <p className="text-xs text-muted-foreground">challenged you to a draft duel</p>
               </div>
               <Badge variant="outline" className="text-primary border-primary/40">Incoming</Badge>
             </div>
             <div className="flex gap-2">
-              <Button
-                className="flex-1"
-                size="sm"
-                onClick={() => handleAccept(receivedChallenge.id)}
-                disabled={isPending}
-              >
+              <Button className="flex-1" size="sm" onClick={() => handleAccept(c.id)} disabled={isPending}>
                 Accept &amp; Start Draft
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDecline(receivedChallenge.id)}
-                disabled={isPending}
-              >
+              <Button variant="ghost" size="sm" onClick={() => handleDecline(c.id)} disabled={isPending}>
                 Decline
               </Button>
             </div>
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {/* Sent challenge waiting */}
-      {sentChallenge && (
-        <Card className="border-border">
+      {/* Sent challenges */}
+      {sentChallenges.map((c) => (
+        <Card key={c.id} className="border-border">
           <CardContent className="pt-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 rounded-full ${getAvatarColor(sentChallenge.challenged.display_name)} flex items-center justify-center`}>
-                <span className="text-white text-sm font-bold">{getInitials(sentChallenge.challenged.display_name)}</span>
+              <div className={`h-10 w-10 rounded-full ${getAvatarColor(c.challenged.display_name)} flex items-center justify-center`}>
+                <span className="text-white text-sm font-bold">{getInitials(c.challenged.display_name)}</span>
               </div>
               <div className="flex-1">
-                <p className="font-medium text-sm">{sentChallenge.challenged.display_name}</p>
+                <p className="font-medium text-sm">{c.challenged.display_name}</p>
                 <p className="text-xs text-muted-foreground">Waiting for them to accept…</p>
               </div>
               <Badge variant="secondary">Pending</Badge>
@@ -139,23 +133,25 @@ export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, r
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => handleCancel(sentChallenge.id)}
+              onClick={() => handleCancel(c.id)}
               disabled={isPending}
             >
               Cancel Challenge
             </Button>
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {/* Challenge list — only show if no active challenge */}
-      {!sentChallenge && !receivedChallenge && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground">League members</p>
-          {challengeable.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No other users in the league yet.</p>
-          ) : (
-            challengeable.map((profile) => (
+      {/* Challenge list — always visible so user can challenge multiple people */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">League members</p>
+        {challengeable.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-8">No other users in the league yet.</p>
+        ) : (
+          challengeable.map((profile) => {
+            const alreadySent = pendingSentIds.has(profile.id)
+            const alreadyReceived = pendingReceivedIds.has(profile.id)
+            return (
               <Card key={profile.id} className="border-border">
                 <CardContent className="flex items-center justify-between py-3 px-4">
                   <div className="flex items-center gap-3">
@@ -164,20 +160,26 @@ export function DraftLobby({ match, currentUserId, allProfiles, sentChallenge, r
                     </div>
                     <span className="text-sm font-medium">{profile.display_name}</span>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleSend(profile.id)}
-                    disabled={isPending}
-                  >
-                    Challenge
-                  </Button>
+                  {alreadySent ? (
+                    <Badge variant="secondary" className="text-xs">Sent</Badge>
+                  ) : alreadyReceived ? (
+                    <Badge variant="outline" className="text-xs text-primary border-primary/40">Incoming</Badge>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSend(profile.id)}
+                      disabled={isPending}
+                    >
+                      Challenge
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
-      )}
+            )
+          })
+        )}
+      </div>
     </div>
   )
 }

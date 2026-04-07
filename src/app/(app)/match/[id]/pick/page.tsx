@@ -2,14 +2,16 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DraftLobby } from "@/components/draft/draft-lobby"
+import { DraftSessionSelector } from "@/components/draft/draft-session-selector"
 import { StarterPicker } from "@/components/draft/starter-picker"
 import { DraftRoom } from "@/components/draft/draft-room"
 import { ImpactPicker } from "@/components/draft/impact-picker"
 import { DraftComplete } from "@/components/draft/draft-complete"
 import type { Challenge, DraftSession, DraftPick, PlayerWithTeam, MatchWithTeams } from "@/lib/types"
 
-export default async function PickPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PickPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ session?: string }> }) {
   const { id: matchId } = await params
+  const { session: sessionIdParam } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
@@ -29,15 +31,24 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
   // Non-upcoming matches → scores page
   if (match.status !== "upcoming") redirect(`/match/${matchId}/scores`)
 
-  // ─── Check for active draft session ───────────────────────
-  const { data: sessionRaw } = await admin
+  // ─── Load ALL active draft sessions for this user ──────────
+  const { data: allSessionsRaw } = await admin
     .from("draft_sessions")
     .select("*")
     .eq("match_id", matchId)
     .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .maybeSingle()
 
-  const session = sessionRaw as DraftSession | null
+  const allSessions = (allSessionsRaw ?? []) as DraftSession[]
+
+  // Determine which session to show
+  let session: DraftSession | null = null
+  if (sessionIdParam && sessionIdParam !== "new") {
+    session = allSessions.find((s) => s.id === sessionIdParam) ?? null
+  } else if (sessionIdParam !== "new" && allSessions.length === 1) {
+    session = allSessions[0]
+  } else if (allSessions.length > 1) {
+    // Multiple sessions — need to pick one; fall through to selector below
+  }
 
   if (session) {
     // Parallel fetch: picks, players, playing XI, profiles, selections
@@ -97,7 +108,6 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
       )
     }
 
-    // team_a: show StarterPicker until both starter AND team are decided
     if (session.phase === "team_a" && (!session.team_a_starter_id || !session.team_a_team_id)) {
       return (
         <StarterPicker
@@ -111,7 +121,6 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
       )
     }
 
-    // team_a / team_b draft room
     return (
       <DraftRoom
         match={match}
@@ -124,6 +133,32 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
     )
   }
 
+  // ─── Multiple sessions — show selector ─────────────────────
+  if (allSessions.length > 1) {
+    // Fetch opponent profiles for all sessions
+    const opponentIds = allSessions.map((s) => s.user1_id === user.id ? s.user2_id : s.user1_id)
+    const { data: opponentProfilesRaw } = await admin
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", opponentIds)
+
+    const opponentProfiles = (opponentProfilesRaw ?? []) as { id: string; display_name: string }[]
+
+    const sessionItems = allSessions.map((s) => {
+      const oppId = s.user1_id === user.id ? s.user2_id : s.user1_id
+      const opp = opponentProfiles.find((p) => p.id === oppId) ?? { id: oppId, display_name: "Opponent" }
+      return { session: s, opponent: opp }
+    })
+
+    return (
+      <DraftSessionSelector
+        match={match}
+        matchId={matchId}
+        sessions={sessionItems}
+      />
+    )
+  }
+
   // ─── No session: show challenge lobby ──────────────────────
   const [{ data: allProfilesRaw }, { data: sentRaw }, { data: receivedRaw }] = await Promise.all([
     admin.from("profiles").select("id, display_name").neq("id", user.id).order("display_name"),
@@ -132,15 +167,13 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
       .select("*, challenged:profiles!challenges_challenged_id_fkey(id, display_name)")
       .eq("match_id", matchId)
       .eq("challenger_id", user.id)
-      .eq("status", "pending")
-      .maybeSingle(),
+      .in("status", ["pending"]),
     admin
       .from("challenges")
       .select("*, challenger:profiles!challenges_challenger_id_fkey(id, display_name)")
       .eq("match_id", matchId)
       .eq("challenged_id", user.id)
-      .eq("status", "pending")
-      .maybeSingle(),
+      .in("status", ["pending"]),
   ])
 
   return (
@@ -148,8 +181,8 @@ export default async function PickPage({ params }: { params: Promise<{ id: strin
       match={match}
       currentUserId={user.id}
       allProfiles={(allProfilesRaw ?? []) as { id: string; display_name: string }[]}
-      sentChallenge={sentRaw as (Challenge & { challenged: { id: string; display_name: string } }) | null}
-      receivedChallenge={receivedRaw as (Challenge & { challenger: { id: string; display_name: string } }) | null}
+      sentChallenges={(sentRaw ?? []) as (Challenge & { challenged: { id: string; display_name: string } })[]}
+      receivedChallenges={(receivedRaw ?? []) as (Challenge & { challenger: { id: string; display_name: string } })[]}
     />
   )
 }

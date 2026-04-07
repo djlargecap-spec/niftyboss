@@ -45,15 +45,6 @@ export async function sendChallenge(
     .maybeSingle()
   if (existing) return { error: "A challenge already exists between you two for this match" }
 
-  // Neither user can already have a draft session for this match
-  const { data: existingSession } = await admin
-    .from("draft_sessions")
-    .select("id")
-    .eq("match_id", matchId)
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id},user1_id.eq.${challengedUserId},user2_id.eq.${challengedUserId}`)
-    .maybeSingle()
-  if (existingSession) return { error: "One of the users already has an active draft for this match" }
-
   // Insert challenge (RLS allows authenticated user to insert when challenger_id = auth.uid())
   const supabase = await createClient()
   const { data: challenge, error: insertError } = await supabase
@@ -102,15 +93,6 @@ export async function acceptChallenge(
 
   const match = challenge.match as { id: string; match_number: number; status: string; team_home_id: string; team_away_id: string }
   if (match.status !== "upcoming") return { error: "Match has already started" }
-
-  // Confirm neither user has a session for this match
-  const { data: existing } = await admin
-    .from("draft_sessions")
-    .select("id")
-    .eq("match_id", match.id)
-    .or(`user1_id.eq.${challenge.challenger_id},user2_id.eq.${challenge.challenger_id},user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .maybeSingle()
-  if (existing) return { error: "A draft session already exists for one of the users" }
 
   // 1. Mark challenge accepted
   await admin.from("challenges").update({ status: "accepted", updated_at: new Date().toISOString() }).eq("id", challengeId)
