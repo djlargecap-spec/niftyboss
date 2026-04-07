@@ -11,7 +11,7 @@ import { formatIST } from "@/lib/utils"
 import type { MatchWithTeams, PlayerWithTeam, MatchPlayerScore } from "@/lib/types"
 import type { PlayerStats } from "@/lib/scoring"
 import { lockMatch, markNoResult, fetchPlayingXI, fetchMatchScorecard, autoScoreMatch, testMatchPoints } from "@/actions/matches"
-import { savePlayerScores, calculateMatchPoints, calculateLiveMatchPoints, savePairings } from "@/actions/scoring"
+import { savePlayerScores, calculateMatchPoints, calculateLiveMatchPoints, savePairings, resetMatchScores } from "@/actions/scoring"
 import { adminUpdateCaptainVc } from "@/actions/selections"
 
 type UserScoreRow = {
@@ -233,6 +233,15 @@ export function AdminMatchClient({
     })
   }
 
+  function handleResetScores() {
+    if (!confirm("Reset all scores for this match? This clears player scores, user scores, and reverts status to live.")) return
+    startTransition(async () => {
+      await resetMatchScores(match.id)
+      showMsg("success", "Scores reset — match reverted to live")
+      router.refresh()
+    })
+  }
+
   function handleLivePoints() {
     startTransition(async () => {
       const res = await calculateLiveMatchPoints(match.id)
@@ -406,6 +415,15 @@ export function AdminMatchClient({
             disabled={isPending || !match.cricapi_match_id}
           >
             Test Fantasy API
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleResetScores}
+            disabled={isPending}
+            className="text-destructive border-destructive/40 hover:bg-destructive/10"
+          >
+            Reset Scores
           </Button>
         </CardContent>
       </Card>

@@ -196,6 +196,20 @@ export async function calculateMatchPoints(matchId: string) {
   return calculateMatchPointsCore(admin, matchId)
 }
 
+export async function resetMatchScores(matchId: string) {
+  await requireAdmin()
+  const admin = createAdminClient()
+
+  await Promise.all([
+    admin.from("user_match_scores").delete().eq("match_id", matchId),
+    admin.from("match_player_scores").delete().eq("match_id", matchId),
+  ])
+
+  await admin.from("matches").update({ status: "live" }).eq("id", matchId)
+
+  return { success: true }
+}
+
 export async function savePairings(
   matchId: string,
   pairs: Array<{ user1_id: string; user2_id: string }>
