@@ -585,7 +585,7 @@ export function AdminMatchClient({
         </Card>
       )}
       {/* H2H Pairings */}
-      {userScores.length > 0 && (
+      {userSelections.length > 0 && (
         <Card className="border border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">H2H Pairings</CardTitle>
@@ -595,7 +595,16 @@ export function AdminMatchClient({
               const usedIds = new Set(
                 pairs.flatMap((p, i) => (i === idx ? [] : [p.user1, p.user2]))
               )
-              const available = userScores.filter((u) => !usedIds.has(u.user_id))
+              // Use userSelections as the source; merge in scored pts if available
+              const scoreMap = new Map(userScores.map((u) => [u.user_id, u.total_points]))
+              const allUsers = userSelections.map((u) => ({
+                user_id: u.user_id,
+                displayName: u.display_name,
+                total_points: scoreMap.get(u.user_id) ?? null,
+              }))
+              const available = allUsers.filter((u) => !usedIds.has(u.user_id))
+              const label = (u: { displayName: string; total_points: number | null }) =>
+                u.total_points != null ? `${u.displayName} (${u.total_points} pts)` : u.displayName
               return (
                 <div key={idx} className="flex items-center gap-2">
                   <select
@@ -608,8 +617,8 @@ export function AdminMatchClient({
                     className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
                   >
                     <option value="">Player 1...</option>
-                    {[...available, ...(pair.user1 ? userScores.filter(u => u.user_id === pair.user1) : [])].map((u) => (
-                      <option key={u.user_id} value={u.user_id}>{u.displayName} ({u.total_points} pts)</option>
+                    {[...available, ...(pair.user1 ? allUsers.filter(u => u.user_id === pair.user1) : [])].map((u) => (
+                      <option key={u.user_id} value={u.user_id}>{label(u)}</option>
                     ))}
                   </select>
                   <span className="text-xs text-muted-foreground shrink-0">vs</span>
@@ -623,15 +632,19 @@ export function AdminMatchClient({
                     className="flex-1 rounded-md border border-border bg-secondary px-2 py-1.5 text-sm"
                   >
                     <option value="">Player 2...</option>
-                    {[...available, ...(pair.user2 ? userScores.filter(u => u.user_id === pair.user2) : [])].filter(u => u.user_id !== pair.user1).map((u) => (
-                      <option key={u.user_id} value={u.user_id}>{u.displayName} ({u.total_points} pts)</option>
+                    {[...available, ...(pair.user2 ? allUsers.filter(u => u.user_id === pair.user2) : [])].filter(u => u.user_id !== pair.user1).map((u) => (
+                      <option key={u.user_id} value={u.user_id}>{label(u)}</option>
                     ))}
                   </select>
-                  {pair.user1 && pair.user2 && (
-                    <span className="text-xs font-bold tabular-nums shrink-0 w-16 text-right">
-                      {userScores.find(u => u.user_id === pair.user1)?.total_points ?? 0}–{userScores.find(u => u.user_id === pair.user2)?.total_points ?? 0}
-                    </span>
-                  )}
+                  {pair.user1 && pair.user2 && (() => {
+                    const p1 = scoreMap.get(pair.user1)
+                    const p2 = scoreMap.get(pair.user2)
+                    return p1 != null && p2 != null ? (
+                      <span className="text-xs font-bold tabular-nums shrink-0 w-16 text-right">
+                        {p1}–{p2}
+                      </span>
+                    ) : null
+                  })()}
                   <Button
                     variant="ghost"
                     size="sm"
