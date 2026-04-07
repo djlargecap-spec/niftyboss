@@ -131,8 +131,8 @@ export default async function PickPage({ params, searchParams }: { params: Promi
     )
   }
 
-  // ─── Any active sessions — show selector ───────────────────
-  if (allSessions.length >= 1) {
+  // ─── Any active sessions — show selector (unless ?session=new → go to lobby) ─
+  if (allSessions.length >= 1 && sessionIdParam !== "new") {
     // Fetch opponent profiles for all sessions
     const opponentIds = allSessions.map((s) => s.user1_id === user.id ? s.user2_id : s.user1_id)
     const { data: opponentProfilesRaw } = await admin
