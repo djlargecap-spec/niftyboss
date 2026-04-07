@@ -41,13 +41,11 @@ export default async function PickPage({ params, searchParams }: { params: Promi
   const allSessions = (allSessionsRaw ?? []) as DraftSession[]
 
   // Determine which session to show
+  // If a specific session is requested via ?session=id, show it directly.
+  // Otherwise always go through the selector so "Challenge another player" is always accessible.
   let session: DraftSession | null = null
   if (sessionIdParam && sessionIdParam !== "new") {
     session = allSessions.find((s) => s.id === sessionIdParam) ?? null
-  } else if (sessionIdParam !== "new" && allSessions.length === 1) {
-    session = allSessions[0]
-  } else if (allSessions.length > 1) {
-    // Multiple sessions — need to pick one; fall through to selector below
   }
 
   if (session) {
@@ -133,8 +131,8 @@ export default async function PickPage({ params, searchParams }: { params: Promi
     )
   }
 
-  // ─── Multiple sessions — show selector ─────────────────────
-  if (allSessions.length > 1) {
+  // ─── Any active sessions — show selector ───────────────────
+  if (allSessions.length >= 1) {
     // Fetch opponent profiles for all sessions
     const opponentIds = allSessions.map((s) => s.user1_id === user.id ? s.user2_id : s.user1_id)
     const { data: opponentProfilesRaw } = await admin

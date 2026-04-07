@@ -33,7 +33,9 @@ export function DraftSessionSelector({ match, matchId, sessions }: Props) {
         <h2 className="text-lg font-bold font-display">
           {match.team_home.short_name} vs {match.team_away.short_name}
         </h2>
-        <p className="text-sm text-muted-foreground mt-1">You have {sessions.length} active drafts — pick one to continue</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {sessions.length === 1 ? "You have an active draft" : `You have ${sessions.length} active drafts`}
+        </p>
       </div>
 
       <div className="space-y-3">
