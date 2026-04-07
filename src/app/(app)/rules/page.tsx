@@ -23,18 +23,56 @@ const CATEGORY_COLOR: Record<ScoringCategory, string> = {
   penalty: "text-red-400",
 }
 
-const gameRules = [
-  { label: "Squad size", value: "Pick 11 from 22 available (combined Playing XI)" },
-  { label: "Wicket-keepers", value: "1 – 4 per team" },
-  { label: "Batters", value: "2 – 5 per team" },
-  { label: "All-rounders", value: "1 – 3 per team" },
-  { label: "Bowlers", value: "2 – 5 per team" },
-  { label: "Max per IPL team", value: "7 players" },
-  { label: "Captain", value: "2× points multiplier" },
-  { label: "Vice-Captain", value: "1.5× points multiplier" },
-  { label: "Auto-pick", value: "Copies previous match team — no C/VC bonus" },
-  { label: "Lock time", value: "Selections lock at match start" },
-  { label: "No Result", value: "All users receive a flat 15 points" },
+const howToPlaySections = [
+  {
+    title: "The Challenge",
+    color: "text-primary",
+    steps: [
+      "Before each match, challenge any league member to a 1v1 draft duel from the match page.",
+      "Your opponent receives a notification. Once they accept, the draft begins immediately.",
+      "You can run multiple simultaneous drafts — challenge as many players as you like for the same match.",
+    ],
+  },
+  {
+    title: "Building Your Roster — The Snake Draft",
+    color: "text-blue-400",
+    steps: [
+      "Both players draft from the combined Playing XI (up to 22 players across both teams).",
+      "A coin toss determines who picks first (Team A). The loser picks second (Team B).",
+      "Picks follow a snake order: Team A picks 1st, 3rd, 5th… Team B picks 2nd, 4th, 6th…",
+      "Each player drafts exactly 8 players. The remaining slots are filled automatically from the undrafted pool.",
+      "The player who picked second (Team B) in this match gets first pick (Team A) in your next match together — the advantage alternates every game.",
+    ],
+  },
+  {
+    title: "Captain & Impact Player",
+    color: "text-amber-400",
+    steps: [
+      "After the draft, each player secretly picks one of their 8 drafted players as their Impact Player.",
+      "The Impact Player earns 2× fantasy points for that match.",
+      "Choose wisely — your opponent won't see your pick until scores are revealed.",
+    ],
+  },
+  {
+    title: "Scoring & Winning",
+    color: "text-emerald-400",
+    steps: [
+      "Fantasy points are calculated after the match based on real performances (runs, wickets, catches, etc.).",
+      "Your total = sum of all 11 players' fantasy points, with your Impact Player doubled.",
+      "The player with the higher total wins the H2H matchup.",
+      "Your net score (your total minus your opponent's) is added to the season leaderboard.",
+      "No Result matches: all players receive a flat 15 points.",
+    ],
+  },
+  {
+    title: "Season Standings",
+    color: "text-purple-400",
+    steps: [
+      "The leaderboard ranks players by cumulative net score across all matches.",
+      "Win big → big positive net. Lose → negative net. The margin matters.",
+      "You can be paired against multiple opponents per match — your net is the sum of all H2H results that match.",
+    ],
+  },
 ]
 
 export default async function RulesPage() {
@@ -76,20 +114,22 @@ export default async function RulesPage() {
         </TabsList>
 
         {/* ── How to Play ── */}
-        <TabsContent value="how-to-play" className="mt-4">
-          <Card className="border border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Game Rules</CardTitle>
-            </CardHeader>
-            <CardContent className="divide-y divide-border/50">
-              {gameRules.map(({ label, value }) => (
-                <div key={label} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0 text-sm">
-                  <span className="text-muted-foreground shrink-0">{label}</span>
-                  <span className="font-medium text-right">{value}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        <TabsContent value="how-to-play" className="mt-4 space-y-4">
+          {howToPlaySections.map((section) => (
+            <Card key={section.title} className="border border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className={`text-base ${section.color}`}>{section.title}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {section.steps.map((step, i) => (
+                  <div key={i} className="flex gap-3 text-sm">
+                    <span className="text-muted-foreground shrink-0 tabular-nums mt-0.5">{i + 1}.</span>
+                    <span className="text-foreground/90 leading-relaxed">{step}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
 
         {/* ── Scoring Guide ── */}
