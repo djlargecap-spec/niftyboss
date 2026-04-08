@@ -304,10 +304,33 @@ export async function GET(req: NextRequest) {
         continue
       }
 
-      // 14. Stamp when live points were last calculated
+      // 14. Apply H2H net_points from pairings (if any set for this match)
+      const { data: pairings } = await admin
+        .from("match_pairings")
+        .select("user1_id, user2_id")
+        .eq("match_id", match.id)
+      if (pairings && pairings.length > 0) {
+        const ptsByUser = new Map(userScores.map((s) => [s.userId, s.total]))
+        const netByUser = new Map<string, number>()
+        for (const pair of pairings) {
+          const p1 = ptsByUser.get(pair.user1_id) ?? 0
+          const p2 = ptsByUser.get(pair.user2_id) ?? 0
+          netByUser.set(pair.user1_id, (netByUser.get(pair.user1_id) ?? 0) + (p1 - p2))
+          netByUser.set(pair.user2_id, (netByUser.get(pair.user2_id) ?? 0) + (p2 - p1))
+        }
+        await Promise.all(
+          [...netByUser.entries()].map(([userId, net]) =>
+            admin.from("user_match_scores")
+              .update({ net_points: net })
+              .eq("match_id", match.id).eq("user_id", userId)
+          )
+        )
+      }
+
+      // 15. Stamp when live points were last calculated
       await admin.from("matches").update({ live_scores_at: new Date().toISOString() }).eq("id", match.id)
 
-      // 15. Auto-detect match finished — only check API when both innings have data
+      // 16. Auto-detect match finished — only check API when both innings have data
       if (result.innings.length >= 2) {
       const fixtureInfo = await getCricketProvider().fetchMatchInfo(match.cricapi_match_id)
       if (fixtureInfo && fixtureInfo.status === "Finished") {
