@@ -33,6 +33,10 @@ export function ImpactPicker({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Sync state when polling brings updated props
+  useEffect(() => { setMySet(initialMySet) }, [initialMySet])
+  useEffect(() => { setOppSet(initialOppSet) }, [initialOppSet])
+
   // Poll every 3s — detect when opponent sets their impact player
   useEffect(() => {
     const interval = setInterval(() => router.refresh(), 3000)

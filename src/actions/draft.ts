@@ -243,14 +243,14 @@ export async function makePick(
     return { error: pickError.message }
   }
 
-  // Add player to the user's selection_players
+  // Add player to the user's selection_players (scoped to this specific session)
   const { data: selection } = await admin
     .from("selections")
     .select("id")
-    .eq("match_id", match.id)
+    .eq("draft_session_id", draftSessionId)
     .eq("user_id", user.id)
     .eq("is_draft_pick", true)
-    .single()
+    .maybeSingle()
   if (selection) {
     await admin.from("selection_players").insert({ selection_id: selection.id, player_id: playerId })
   }
@@ -302,11 +302,11 @@ export async function setImpactPlayer(
     .maybeSingle()
   if (!pick) return { error: "Player not in your drafted team" }
 
-  // Update captain_id + impact_player_id on this user's selection
+  // Update captain_id + impact_player_id on this user's selection (scoped to this session)
   await admin
     .from("selections")
     .update({ captain_id: playerId, impact_player_id: playerId, updated_at: new Date().toISOString() })
-    .eq("match_id", session.match_id)
+    .eq("draft_session_id", draftSessionId)
     .eq("user_id", user.id)
     .eq("is_draft_pick", true)
 

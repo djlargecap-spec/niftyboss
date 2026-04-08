@@ -77,6 +77,38 @@ export default async function PickPage({ params, searchParams }: { params: Promi
     const opponentSelection = selections.find((s) => s.user_id === opponentId) ?? { captain_id: null, impact_player_id: null }
 
     if (session.phase === "impact_selection") {
+      const myImpactSet = mySelection.captain_id !== null
+      const opponentImpactSet = opponentSelection.captain_id !== null
+
+      // Recovery: race condition where both picked simultaneously but neither triggered the
+      // phase transition. Detect it here on the next poll and complete the session.
+      if (myImpactSet && opponentImpactSet) {
+        const now = new Date().toISOString()
+        await admin
+          .from("selections")
+          .update({ locked_at: now, updated_at: now })
+          .eq("draft_session_id", session.id)
+          .eq("is_draft_pick", true)
+        await admin
+          .from("draft_sessions")
+          .update({ status: "complete", phase: "complete", updated_at: now })
+          .eq("id", session.id)
+
+        return (
+          <DraftComplete
+            match={match}
+            currentUserId={user.id}
+            opponentDisplayName={opponentProfile.display_name}
+            myPicks={myPicks}
+            opponentPicks={opponentPicks}
+            players={players}
+            playingXIIds={playingXIIds}
+            mySelection={{ impactPlayerId: mySelection.impact_player_id }}
+            opponentSelection={{ impactPlayerId: opponentSelection.impact_player_id }}
+          />
+        )
+      }
+
       return (
         <ImpactPicker
           session={session}
@@ -84,8 +116,8 @@ export default async function PickPage({ params, searchParams }: { params: Promi
           players={players}
           currentUserId={user.id}
           opponentDisplayName={opponentProfile.display_name}
-          myImpactSet={mySelection.captain_id !== null}
-          opponentImpactSet={opponentSelection.captain_id !== null}
+          myImpactSet={myImpactSet}
+          opponentImpactSet={opponentImpactSet}
         />
       )
     }
