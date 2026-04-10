@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { PageTransition } from "@/components/page-transition"
 import { ScoresClient } from "./scores-client"
-import type { TeamInfo, PlayerScoreRow, UserScoreRow, SelectionRow } from "./scores-client"
+import type { TeamInfo, PlayerScoreRow, UserScoreRow, SelectionRow, H2HDuel } from "./scores-client"
 
 export default async function ScoresPage({
   params,
@@ -18,7 +18,7 @@ export default async function ScoresPage({
   const admin = createAdminClient()
 
   // All queries in parallel
-  const [matchRes, playerScoresRes, userScoresRes, mySelectionRes, allSelectionsRes, captainPicksRes] = await Promise.all([
+  const [matchRes, playerScoresRes, userScoresRes, mySelectionRes, allSelectionsRes, captainPicksRes, draftSessionsRes] = await Promise.all([
     admin
       .from("matches")
       .select("*, team_home:teams!matches_team_home_id_fkey(short_name, color, logo_url), team_away:teams!matches_team_away_id_fkey(short_name, color, logo_url)")
@@ -44,7 +44,7 @@ export default async function ScoresPage({
       .maybeSingle(),
     admin
       .from("selections")
-      .select("user_id, captain_id, vice_captain_id, selection_players(player_id)")
+      .select("user_id, captain_id, vice_captain_id, is_draft_pick, draft_session_id, selection_players(player_id)")
       .eq("match_id", id)
       .limit(200),
     admin
@@ -52,6 +52,11 @@ export default async function ScoresPage({
       .select("user_id, captain_id, captain:players!selections_captain_id_fkey(name)")
       .eq("match_id", id)
       .not("captain_id", "is", null),
+    admin
+      .from("draft_sessions")
+      .select("id, user1_id, user2_id")
+      .eq("match_id", id)
+      .eq("status", "complete"),
   ])
 
   const match = matchRes.data
@@ -73,6 +78,8 @@ export default async function ScoresPage({
         user_id: s.user_id,
         captain_id: s.captain_id as string | null,
         vice_captain_id: s.vice_captain_id as string | null,
+        is_draft_pick: s.is_draft_pick as boolean,
+        draft_session_id: s.draft_session_id as string | null,
         player_ids: (s.selection_players as { player_id: string }[]).map((sp) => sp.player_id),
       }))
     : []
@@ -125,6 +132,7 @@ export default async function ScoresPage({
         allSelections={allSelections}
         captainPicks={captainPicks}
         currentUserId={user.id}
+        h2hDuels={(draftSessionsRes.data ?? []) as H2HDuel[]}
       />
     </PageTransition>
   )

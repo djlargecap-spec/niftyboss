@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { ArrowLeft, ChevronDown, Trophy, Users, ClipboardList } from "lucide-react"
+import { ArrowLeft, ChevronDown, Trophy, Users, ClipboardList, ArrowLeftRight } from "lucide-react"
 import { RankBadge } from "@/components/rank-badge"
 import { Podium } from "@/components/podium"
 import { TeamLogo } from "@/components/team-logo"
@@ -50,7 +50,15 @@ export type SelectionRow = {
   user_id: string
   captain_id: string | null
   vice_captain_id: string | null
+  is_draft_pick: boolean
+  draft_session_id: string | null
   player_ids: string[]
+}
+
+export type H2HDuel = {
+  id: string
+  user1_id: string
+  user2_id: string
 }
 
 type Props = {
@@ -74,6 +82,7 @@ type Props = {
   allSelections: SelectionRow[]
   captainPicks: Record<string, { name: string }>
   currentUserId: string
+  h2hDuels?: H2HDuel[]
   banter?: Array<{ message: string; event_type: string }>
 }
 
@@ -108,7 +117,7 @@ function econ(runs: number, overs: number): string {
 export function ScoresClient({
   match, home, away, playerScores, userScores, myScore,
   myPlayerIds, myCaptainId, myVcId, isDraftPick = false, allSelections,
-  captainPicks, currentUserId, banter = [],
+  captainPicks, currentUserId, h2hDuels = [], banter = [],
 }: Props) {
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
   const myPlayerSet = new Set(myPlayerIds)
@@ -119,6 +128,16 @@ export function ScoresClient({
   // Build lookup maps
   const psMap = new Map(playerScores.map((ps) => [ps.player_id, ps]))
   const selMap = new Map(allSelections.map((s) => [s.user_id, s]))
+  // For H2H: key = `${draft_session_id}|${user_id}` → precise per-session selection
+  const draftSelMap = new Map<string, SelectionRow>()
+  for (const s of allSelections) {
+    if (s.is_draft_pick && s.draft_session_id) {
+      draftSelMap.set(`${s.draft_session_id}|${s.user_id}`, s)
+    }
+  }
+  const userScoreMap = new Map(userScores.map((s) => [s.user_id, s]))
+
+  const hasH2H = h2hDuels.length > 0
 
   // Podium data
   const podiumEntries = userScores.length >= 3
@@ -231,16 +250,22 @@ export function ScoresClient({
       {/* ── Tabs ─────────────────────────────────────────── */}
       {playerScores.length > 0 || userScores.length > 0 ? (
         <Tabs defaultValue={playerScores.length === 0 ? "leaderboard" : "your-xi"} className="px-4 md:px-6">
-          <TabsList className="w-full grid grid-cols-3 mb-4">
-            <TabsTrigger value="your-xi" className="gap-1.5 text-xs">
+          <TabsList className={cn("w-full mb-4", hasH2H ? "grid grid-cols-4" : "grid grid-cols-3")}>
+            <TabsTrigger value="your-xi" className="gap-1 text-xs">
               <ClipboardList className="h-3.5 w-3.5" />
-              Your XI
+              {hasH2H ? "My XI" : "Your XI"}
             </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="gap-1.5 text-xs">
+            <TabsTrigger value="leaderboard" className="gap-1 text-xs">
               <Trophy className="h-3.5 w-3.5" />
-              Leaderboard
+              {hasH2H ? "Board" : "Leaderboard"}
             </TabsTrigger>
-            <TabsTrigger value="scorecard" className="gap-1.5 text-xs">
+            {hasH2H && (
+              <TabsTrigger value="h2h" className="gap-1 text-xs">
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                H2H
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="scorecard" className="gap-1 text-xs">
               <Users className="h-3.5 w-3.5" />
               Scorecard
             </TabsTrigger>
@@ -407,6 +432,140 @@ export function ScoresClient({
               </div>
             )}
           </TabsContent>
+
+          {/* ── Tab: H2H Duels ───────────────────────────── */}
+          {hasH2H && (
+            <TabsContent value="h2h">
+              {h2hDuels.map((duel) => {
+                const scoreA = userScoreMap.get(duel.user1_id)
+                const scoreB = userScoreMap.get(duel.user2_id)
+                const selA = draftSelMap.get(`${duel.id}|${duel.user1_id}`)
+                const selB = draftSelMap.get(`${duel.id}|${duel.user2_id}`)
+
+                const nameA = scoreA?.profile.display_name ?? "—"
+                const nameB = scoreB?.profile.display_name ?? "—"
+                const ptsA = Number(scoreA?.total_points ?? 0)
+                const ptsB = Number(scoreB?.total_points ?? 0)
+                const diff = ptsA - ptsB
+                const winsA = !scoringPending && diff > 0
+                const winsB = !scoringPending && diff < 0
+                const isTie = !scoringPending && diff === 0 && (ptsA > 0 || ptsB > 0)
+
+                const makePlayerList = (sel: SelectionRow | undefined) => {
+                  if (!sel) return []
+                  return sel.player_ids
+                    .map((pid) => {
+                      const ps = psMap.get(pid)
+                      if (!ps) return null
+                      const isC = sel.captain_id === pid
+                      const isVC = sel.vice_captain_id === pid
+                      const mult = isC ? 2 : isVC ? 1.5 : 1
+                      const eff = Math.round(Number(ps.fantasy_points) * mult * 100) / 100
+                      return { ...ps, isC, isVC, isDraft: sel.is_draft_pick, eff }
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => b!.eff - a!.eff)
+                }
+
+                const playersA = makePlayerList(selA)
+                const playersB = makePlayerList(selB)
+                const maxRows = Math.max(playersA.length, playersB.length)
+
+                return (
+                  <div key={duel.id} className="rounded-xl border border-border/40 bg-[hsl(var(--background))] overflow-hidden mb-4">
+                    {/* Header: name / pts / win indicator */}
+                    <div className="grid grid-cols-[1fr_2rem_1fr] border-b border-border/30 bg-secondary/20">
+                      {/* User A */}
+                      <div className={cn("flex flex-col items-center py-3 px-2", winsA && "bg-green-500/5")}>
+                        <div className={cn("h-8 w-8 rounded-full flex items-center justify-center mb-1", getAvatarColor(nameA))}>
+                          <span className="text-white text-[11px] font-semibold">{getInitials(nameA)}</span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-center truncate w-full px-1">{nameA}</p>
+                        {duel.user1_id === currentUserId && <span className="text-[9px] text-primary">(you)</span>}
+                        <p className={cn("text-2xl font-bold font-display tabular-nums mt-1", winsA ? "text-green-400" : "")}>
+                          {scoringPending ? "—" : ptsA}
+                        </p>
+                        {winsA && <span className="text-[9px] font-bold text-green-400 tracking-wide">WIN +{diff}</span>}
+                        {isTie && <span className="text-[9px] text-muted-foreground">TIE</span>}
+                      </div>
+
+                      {/* VS divider */}
+                      <div className="flex items-center justify-center text-[11px] font-bold text-muted-foreground">VS</div>
+
+                      {/* User B */}
+                      <div className={cn("flex flex-col items-center py-3 px-2", winsB && "bg-green-500/5")}>
+                        <div className={cn("h-8 w-8 rounded-full flex items-center justify-center mb-1", getAvatarColor(nameB))}>
+                          <span className="text-white text-[11px] font-semibold">{getInitials(nameB)}</span>
+                        </div>
+                        <p className="text-[11px] font-semibold text-center truncate w-full px-1">{nameB}</p>
+                        {duel.user2_id === currentUserId && <span className="text-[9px] text-primary">(you)</span>}
+                        <p className={cn("text-2xl font-bold font-display tabular-nums mt-1", winsB ? "text-green-400" : "")}>
+                          {scoringPending ? "—" : ptsB}
+                        </p>
+                        {winsB && <span className="text-[9px] font-bold text-green-400 tracking-wide">WIN +{Math.abs(diff)}</span>}
+                        {isTie && <span className="text-[9px] text-muted-foreground">TIE</span>}
+                      </div>
+                    </div>
+
+                    {/* Player-by-player comparison */}
+                    {maxRows > 0 && (
+                      <div className="grid grid-cols-2 divide-x divide-border/20">
+                        {/* User A players */}
+                        <div className="py-1.5">
+                          {playersA.map((p) => (
+                            <div key={p!.player_id} className="flex items-center gap-1 px-2 py-[3px]">
+                              <span className={cn(
+                                "text-[9px] font-bold shrink-0 w-3 text-center leading-none",
+                                p!.isC ? "text-amber-400" : p!.isVC ? "text-sky-400" : "text-transparent"
+                              )}>
+                                {p!.isC ? (p!.isDraft ? "★" : "C") : p!.isVC ? "V" : "·"}
+                              </span>
+                              <span className="text-[11px] truncate flex-1 min-w-0 font-medium">{p!.player.name}</span>
+                              <span className="text-[11px] font-bold tabular-nums shrink-0 ml-1 text-right w-8">
+                                {scoringPending ? "—" : p!.eff}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* User B players */}
+                        <div className="py-1.5">
+                          {playersB.map((p) => (
+                            <div key={p!.player_id} className="flex items-center gap-1 px-2 py-[3px]">
+                              <span className={cn(
+                                "text-[9px] font-bold shrink-0 w-3 text-center leading-none",
+                                p!.isC ? "text-amber-400" : p!.isVC ? "text-sky-400" : "text-transparent"
+                              )}>
+                                {p!.isC ? (p!.isDraft ? "★" : "C") : p!.isVC ? "V" : "·"}
+                              </span>
+                              <span className="text-[11px] truncate flex-1 min-w-0 font-medium">{p!.player.name}</span>
+                              <span className="text-[11px] font-bold tabular-nums shrink-0 ml-1 text-right w-8">
+                                {scoringPending ? "—" : p!.eff}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer totals (only once scoring is done) */}
+                    {!scoringPending && (ptsA > 0 || ptsB > 0) && (
+                      <div className="grid grid-cols-2 divide-x divide-border/20 border-t border-border/30 bg-secondary/10">
+                        <div className="px-3 py-1.5 flex items-center justify-between">
+                          <span className="text-[9px] text-muted-foreground uppercase tracking-wide font-semibold">Total</span>
+                          <span className={cn("text-sm font-bold font-display tabular-nums", winsA ? "text-green-400" : "")}>{ptsA}</span>
+                        </div>
+                        <div className="px-3 py-1.5 flex items-center justify-between">
+                          <span className="text-[9px] text-muted-foreground uppercase tracking-wide font-semibold">Total</span>
+                          <span className={cn("text-sm font-bold font-display tabular-nums", winsB ? "text-green-400" : "")}>{ptsB}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </TabsContent>
+          )}
 
           {/* ── Tab: Scorecard (ESPN-style by team) ─────── */}
           <TabsContent value="scorecard">
